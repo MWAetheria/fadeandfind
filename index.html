@@ -377,7 +377,7 @@ const MapView = ({ allListings, visibleIds, selectedId, onSelect, routeMode, rou
 };
 
 // ── Listing Card ──────────────────────────────────────
-const ListingCard = ({ listing, isSelected, isFavorite, isRouteStop, routeIndex, onSelect, onFavorite, onAddRoute, onUnflag, isClosed, isVerify, onMarkClosed, onMarkVerify, onClearStatus, isBeenThere, onToggleBeenThere, onHide }) => {
+const ListingCard = ({ listing, isSelected, isFavorite, isRouteStop, routeIndex, onSelect, onFavorite, onAddRoute, onUnflag, isClosed, isVerify, onMarkClosed, onMarkVerify, onClearStatus, isBeenThere, onToggleBeenThere, onHide, isGuest, onSignUp }) => {
   const cat = CATEGORIES[listing.category] || CATEGORIES.estate;
 
   // Flagged listings render as a compact dismissible warning row
@@ -497,14 +497,14 @@ const ListingCard = ({ listing, isSelected, isFavorite, isRouteStop, routeIndex,
             {/* Been There + Hide */}
             <div style={{display:"flex",gap:6,marginBottom:6}}>
               <button
-                onClick={e=>{e.stopPropagation(); onToggleBeenThere(listing.id);}}
+                onClick={e=>{e.stopPropagation(); isGuest ? onSignUp() : onToggleBeenThere(listing.id);}}
                 style={{flex:1,padding:"7px 8px",borderRadius:6,fontSize:11,fontFamily:"var(--ff-mono)",cursor:"pointer",
                   border: isBeenThere ? "1px solid #4A8A4A" : "1px solid var(--border)",
-                  background: isBeenThere ? "#D4F0D4" : "transparent",
-                  color: isBeenThere ? "#8ABA8A" : "var(--muted)",
+                  background: isBeenThere ? "#C4E8C4" : "transparent",
+                  color: isBeenThere ? "#3A7A3A" : "var(--muted)",
                   fontWeight: isBeenThere ? 700 : 400,
                 }}
-              >{isBeenThere ? "👣 Been There" : "👣 Been There?"}</button>
+              >{isGuest ? "👣 Been There? 🔒" : isBeenThere ? "👣 Been There" : "👣 Been There?"}</button>
               {isBeenThere && (
                 <button
                   onClick={e=>{e.stopPropagation(); onHide(listing.id);}}
@@ -872,6 +872,7 @@ function FadeAndFind() {
   const [searchText, setSearchText] = useState("");
   const [mapBounds, setMapBounds] = useState(null);
   const [manuallyKept, setManuallyKept] = useState(new Set());
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [closedIds,    setClosedIds]    = useState(new Set());
   const [verifyIds,    setVerifyIds]    = useState(new Set());
   const [beenThereIds, setBeenThereIds] = useState(new Set());
@@ -975,14 +976,8 @@ function FadeAndFind() {
     );
   }
 
-  // Show auth screen if not logged in
-  if (!user) {
-    return (
-      <div style={cssVars}>
-        <AuthScreen onAuth={setUser}/>
-      </div>
-    );
-  }
+  // Guest mode — no hard wall, just limited features
+  const isGuest = !user;
 
   // Show load screen until user picks a file
   if (liveListings === null) {
@@ -1032,12 +1027,31 @@ function FadeAndFind() {
     });
 
   const favoriteListings = liveListings.filter(l => favorites.includes(l.id));
-  const toggleFavorite   = toggleFavoriteWithSync;
+  const toggleFavorite   = isGuest ? ()=>setShowAuthModal(true) : toggleFavoriteWithSync;
   const toggleRouteStop  = (id) => { setRouteStops(s => s.includes(id) ? s.filter(x=>x!==id) : [...s,id]); if (!routeMode) setRouteMode(true); };
   const userInitial = user?.email?.[0]?.toUpperCase() || "?";
 
   return (
     <div style={cssVars}>
+
+      {/* ── Auth Modal ── */}
+      {showAuthModal && (
+        <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(44,24,16,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div style={{background:"var(--bg)",borderRadius:14,padding:4,width:"100%",maxWidth:400,position:"relative",boxShadow:"0 8px 40px rgba(0,0,0,0.2)"}}>
+            <button onClick={()=>setShowAuthModal(false)} style={{position:"absolute",top:12,right:12,width:28,height:28,borderRadius:"50%",border:"1px solid var(--border)",background:"var(--card-bg)",cursor:"pointer",fontSize:14,color:"var(--muted)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1}}>✕</button>
+            <AuthScreen onAuth={(u)=>{ setUser(u); setShowAuthModal(false); }}/>
+          </div>
+        </div>
+      )}
+
+      {/* ── Guest banner ── */}
+      {isGuest && (
+        <div style={{background:"var(--accent)",padding:"8px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+          <span style={{fontSize:12,color:"#F5EFE0",fontFamily:"var(--ff-mono)"}}>👋 You're browsing as a guest — favorites & routes won't be saved.</span>
+          <button onClick={()=>setShowAuthModal(true)} style={{fontSize:11,fontWeight:700,color:"var(--accent)",background:"#F5EFE0",border:"none",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontFamily:"var(--ff-mono)",whiteSpace:"nowrap"}}>Sign Up Free</button>
+        </div>
+      )}
+
       {/* ── Header ── */}
       <header style={{padding:"16px 20px 12px",position:"relative",zIndex:10,borderBottom:"1px solid var(--border)"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
@@ -1050,11 +1064,15 @@ function FadeAndFind() {
           </div>
           <div style={{display:"flex",gap:6,alignItems:"center"}}>
             <div style={{width:36,height:36,borderRadius:8,background:"var(--card-bg)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,cursor:"pointer"}}>🔔</div>
-            <div
-              title={`Signed in as ${user?.email}\nClick to sign out`}
-              onClick={async()=>{ if(window.confirm("Sign out?")){ await db.auth.signOut(); setUser(null); }}}
-              style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#C4922A,#8B6F47)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:"#F5EFE0",cursor:"pointer"}}
-            >{userInitial}</div>
+            {isGuest ? (
+              <button onClick={()=>setShowAuthModal(true)} style={{height:36,padding:"0 12px",borderRadius:18,background:"var(--accent)",border:"none",color:"#F5EFE0",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"var(--ff-mono)",whiteSpace:"nowrap"}}>Sign In</button>
+            ) : (
+              <div
+                title={`Signed in as ${user?.email}\nClick to sign out`}
+                onClick={async()=>{ if(window.confirm("Sign out?")){ await db.auth.signOut(); setUser(null); }}}
+                style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#C4922A,#8B6F47)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:"#F5EFE0",cursor:"pointer"}}
+              >{userInitial}</div>
+            )}
           </div>
         </div>
         <div style={{display:"flex",gap:8}}>
@@ -1105,7 +1123,7 @@ function FadeAndFind() {
             </div>
             <div style={{padding:"4px 16px 100px"}}>
               {filteredListings.map(l=>(
-                <ListingCard key={l.id} listing={l} isSelected={selectedId===l.id} isFavorite={favorites.includes(l.id)} isRouteStop={routeStops.includes(l.id)} routeIndex={routeStops.indexOf(l.id)} onSelect={setSelectedId} onFavorite={toggleFavorite} onAddRoute={toggleRouteStop} onUnflag={handleUnflag} isClosed={closedIds.has(l.id)} isVerify={verifyIds.has(l.id)} onMarkClosed={markClosed} onMarkVerify={markVerify} onClearStatus={clearStatus} isBeenThere={beenThereIds.has(l.id)} onToggleBeenThere={toggleBeenThere} onHide={hideId}/>
+                <ListingCard key={l.id} listing={l} isSelected={selectedId===l.id} isFavorite={favorites.includes(l.id)} isRouteStop={routeStops.includes(l.id)} routeIndex={routeStops.indexOf(l.id)} onSelect={setSelectedId} onFavorite={toggleFavorite} onAddRoute={toggleRouteStop} onUnflag={handleUnflag} isClosed={closedIds.has(l.id)} isVerify={verifyIds.has(l.id)} onMarkClosed={markClosed} onMarkVerify={markVerify} onClearStatus={clearStatus} isBeenThere={beenThereIds.has(l.id)} onToggleBeenThere={toggleBeenThere} onHide={hideId} isGuest={isGuest} onSignUp={()=>setShowAuthModal(true)}/>
               ))}
             </div>
           </div>
@@ -1114,10 +1132,17 @@ function FadeAndFind() {
         {activeTab==="favorites" && (
           <div style={{padding:"16px",animation:"fadeIn 0.3s ease"}}>
             <h3 style={{fontFamily:"var(--ff-heading)",fontSize:18,marginBottom:12,color:"var(--text)"}}>Saved Listings</h3>
-            {favoriteListings.length===0 ? (
+            {isGuest ? (
+              <div style={{textAlign:"center",padding:"32px 16px"}}>
+                <div style={{fontSize:32,marginBottom:12}}>❤️</div>
+                <p style={{fontSize:14,color:"var(--text)",marginBottom:8,fontFamily:"var(--ff-heading)"}}>Save your favorites</p>
+                <p style={{fontSize:12,color:"var(--muted)",marginBottom:20,fontFamily:"var(--ff-body)"}}>Create a free account to save listings and access them on any device.</p>
+                <button onClick={()=>setShowAuthModal(true)} style={{padding:"10px 24px",borderRadius:8,border:"none",background:"var(--accent)",color:"#F5EFE0",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"var(--ff-heading)"}}>Create Free Account</button>
+              </div>
+            ) : favoriteListings.length===0 ? (
               <p style={{color:"var(--muted)",fontSize:13}}>No saved listings yet. Tap ❤️ on any listing.</p>
             ) : favoriteListings.map(l=>(
-              <ListingCard key={l.id} listing={l} isSelected={selectedId===l.id} isFavorite={true} isRouteStop={routeStops.includes(l.id)} routeIndex={routeStops.indexOf(l.id)} onSelect={setSelectedId} onFavorite={toggleFavorite} onAddRoute={toggleRouteStop} onUnflag={handleUnflag} isClosed={closedIds.has(l.id)} isVerify={verifyIds.has(l.id)} onMarkClosed={markClosed} onMarkVerify={markVerify} onClearStatus={clearStatus} isBeenThere={beenThereIds.has(l.id)} onToggleBeenThere={toggleBeenThere} onHide={hideId}/>
+              <ListingCard key={l.id} listing={l} isSelected={selectedId===l.id} isFavorite={true} isRouteStop={routeStops.includes(l.id)} routeIndex={routeStops.indexOf(l.id)} onSelect={setSelectedId} onFavorite={toggleFavorite} onAddRoute={toggleRouteStop} onUnflag={handleUnflag} isClosed={closedIds.has(l.id)} isVerify={verifyIds.has(l.id)} onMarkClosed={markClosed} onMarkVerify={markVerify} onClearStatus={clearStatus} isBeenThere={beenThereIds.has(l.id)} onToggleBeenThere={toggleBeenThere} onHide={hideId} isGuest={isGuest} onSignUp={()=>setShowAuthModal(true)}/>
             ))}
           </div>
         )}
