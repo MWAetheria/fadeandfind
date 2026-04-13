@@ -14,11 +14,11 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #1A1611; }
+    body { background: #F5EFE0; }
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #3A3228; border-radius: 3px; }
-    input::placeholder { color: #6A5E4F; }
+    ::-webkit-scrollbar-thumb { background: #C4B49A; border-radius: 3px; }
+    input::placeholder { color: #A8967E; }
     @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes pulse { 0%,100% { opacity:.6 } 50% { opacity:1 } }
@@ -66,7 +66,7 @@ const AuthScreen = ({ onAuth }) => {
 
   return (
     <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24,padding:32,background:"var(--bg)"}}>
-      <h1 style={{fontFamily:"'Playfair Display',Georgia,serif",fontSize:40,fontWeight:900,background:"linear-gradient(135deg,#E8DDD0 0%,#D4A574 100%)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Fade & Find</h1>
+      <h1 style={{fontFamily:"'Playfair Display',Georgia,serif",fontSize:40,fontWeight:900,background:"linear-gradient(135deg,#2C1810 0%,#C4922A 100%)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Fade & Find</h1>
       <p style={{fontFamily:"monospace",fontSize:11,color:"var(--muted)",letterSpacing:"0.15em",textTransform:"uppercase"}}>Where forgotten things find new homes.</p>
       <div style={{maxWidth:360,width:"100%",padding:28,background:"var(--card-bg)",borderRadius:12,border:"1px solid var(--border)"}}>
         <h3 style={{fontFamily:"var(--ff-heading)",fontSize:18,color:"var(--text)",marginBottom:20,textAlign:"center"}}>
@@ -97,7 +97,7 @@ const AuthScreen = ({ onAuth }) => {
 };
 
 const CATEGORIES = {
-  estate:   { label: "Estate Sales",   icon: "🏠", color: "#D4A574" },
+  estate:   { label: "Estate Sales",   icon: "🏠", color: "#C4922A" },
   antique:  { label: "Antique Stores", icon: "🏺", color: "#8B6F47" },
   auction:  { label: "Auctions",       icon: "🔨", color: "#C17F59" },
   flea:     { label: "Flea Markets",   icon: "🎪", color: "#A67B5B" },
@@ -138,7 +138,7 @@ function classifyListing(name, originalCategory) {
 }
 
 const GROUPS = [
-  { id: 1, name: "NE Pickers Crew",  members: ["You", "Jack", "Thea"],      color: "#D4A574", icon: "⚡" },
+  { id: 1, name: "NE Pickers Crew",  members: ["You", "Jack", "Thea"],      color: "#C4922A", icon: "⚡" },
   { id: 2, name: "Weekend Warriors", members: ["You", "PJ", "Linda K."],    color: "#8B6F47", icon: "🗺️" },
 ];
 
@@ -223,7 +223,7 @@ const MapView = ({ allListings, visibleIds, selectedId, onSelect, routeMode, rou
     const map = L.map(mapRef.current, { zoomControl: false });
     L.control.zoom({ position: "topright" }).addTo(map);
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
       maxZoom: 19,
     }).addTo(map);
@@ -269,7 +269,7 @@ const MapView = ({ allListings, visibleIds, selectedId, onSelect, routeMode, rou
         className: "",
         html: `<div style="
           width:${size}px;height:${size}px;border-radius:50%;
-          background:${cat.color};border:2px solid #1A1611;
+          background:${cat.color};border:2px solid #F5EFE0;
           display:flex;align-items:center;justify-content:center;
           font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,0.5);
           position:relative;
@@ -284,7 +284,7 @@ const MapView = ({ allListings, visibleIds, selectedId, onSelect, routeMode, rou
         .on("click", () => onSelect(l.id));
 
       marker.bindTooltip(
-        `<div style="font-family:sans-serif;font-size:12px;font-weight:600;color:#1A1611">${l.name}</div>`,
+        `<div style="font-family:sans-serif;font-size:12px;font-weight:600;color:#F5EFE0">${l.name}</div>`,
         { permanent: false, direction: "top", offset: [0, -size/2], className: "fadeandfind-tooltip" }
       );
 
@@ -320,13 +320,13 @@ const MapView = ({ allListings, visibleIds, selectedId, onSelect, routeMode, rou
         className: "",
         html: `<div style="
           width:${size}px;height:${size}px;border-radius:50%;
-          background:${cat.color};border:${isSel ? "3px solid #E8DDD0" : "2px solid #1A1611"};
+          background:${cat.color};border:${isSel ? "3px solid #E8DDD0" : "2px solid #F5EFE0"};
           display:flex;align-items:center;justify-content:center;
           font-size:${isSel ? 16 : 13}px;
           box-shadow:0 2px 8px rgba(0,0,0,0.5);
           position:relative;
           ${listing.featured ? `box-shadow:0 0 0 3px ${cat.color}44,0 2px 8px rgba(0,0,0,0.5);` : ""}
-        ">${cat.icon}${isRoute ? `<span style="position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:#D4A574;color:#1A1611;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;">${rIdx+1}</span>` : ""}</div>`,
+        ">${cat.icon}${isRoute ? `<span style="position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:#C4922A;color:#F5EFE0;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;">${rIdx+1}</span>` : ""}</div>`,
         iconSize: [size, size],
         iconAnchor: [size/2, size/2],
       });
@@ -356,7 +356,7 @@ const MapView = ({ allListings, visibleIds, selectedId, onSelect, routeMode, rou
       .map(l => [l.lat, l.lng]);
     if (points.length > 1) {
       routeLineRef.current = L.polyline(points, {
-        color: "#D4A574", weight: 3, dashArray: "8 6", opacity: 0.8,
+        color: "#C4922A", weight: 3, dashArray: "8 6", opacity: 0.8,
       }).addTo(map);
     }
   }, [routeMode, routeStops]);
@@ -365,12 +365,12 @@ const MapView = ({ allListings, visibleIds, selectedId, onSelect, routeMode, rou
     <div style={{ width:"100%", height:480, borderRadius:12, overflow:"hidden", position:"relative", border:"1px solid var(--border)" }}>
       <div ref={mapRef} style={{ width:"100%", height:"100%" }} />
       <style>{`
-        .fadeandfind-tooltip { background:#E8DDD0; border:none; border-radius:6px; padding:4px 8px; box-shadow:0 2px 8px rgba(0,0,0,0.4); }
+        .fadeandfind-tooltip { background:#2C1810; color:#F5EFE0; border:none; border-radius:6px; padding:4px 8px; box-shadow:0 2px 8px rgba(0,0,0,0.2); }
         .fadeandfind-tooltip::before { display:none; }
         .leaflet-control-zoom { border:none !important; }
-        .leaflet-control-zoom a { background:#231E18 !important; color:#E8DDD0 !important; border-color:#3A3228 !important; }
-        .leaflet-control-attribution { background:rgba(26,22,17,0.8) !important; color:#8A7E6F !important; font-size:9px !important; }
-        .leaflet-control-attribution a { color:#D4A574 !important; }
+        .leaflet-control-zoom a { background:#EDE5D0 !important; color:#2C1810 !important; border-color:#D4C4A8 !important; }
+        .leaflet-control-attribution { background:rgba(245,239,224,0.9) !important; color:#8A7A65 !important; font-size:9px !important; }
+        .leaflet-control-attribution a { color:#C4922A !important; }
       `}</style>
     </div>
   );
@@ -386,7 +386,7 @@ const ListingCard = ({ listing, isSelected, isFavorite, isRouteStop, routeIndex,
       <div style={{
         display:"flex", alignItems:"center", gap:10, padding:"8px 12px",
         borderRadius:8, marginBottom:6, opacity:0.7,
-        background:"#2A1E1A", border:"1px dashed #6A3A2A",
+        background:"#F0E4D4", border:"1px dashed #C47A5A",
       }}>
         <span style={{fontSize:13}}>🚩</span>
         <div style={{flex:1, minWidth:0}}>
@@ -403,9 +403,9 @@ const ListingCard = ({ listing, isSelected, isFavorite, isRouteStop, routeIndex,
   }
 
   const statusBanner = isClosed
-    ? { bg:"#2A1414", border:"#6A2A2A", color:"#C86A6A", icon:"🚫", label:"Reported Closed · verify before visiting" }
+    ? { bg:"#F5D4D4", border:"#C45A5A", color:"#C86A6A", icon:"🚫", label:"Reported Closed · verify before visiting" }
     : isVerify
-    ? { bg:"#2A2414", border:"#6A5A2A", color:"#C8A86A", icon:"⚠️", label:"Verify First · call ahead or check website" }
+    ? { bg:"#F5EDD4", border:"#B8962A", color:"#C8A86A", icon:"⚠️", label:"Verify First · call ahead or check website" }
     : null;
 
   return (
@@ -432,7 +432,7 @@ const ListingCard = ({ listing, isSelected, isFavorite, isRouteStop, routeIndex,
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
             <div style={{fontSize:14,fontWeight:700,color: isClosed ? "var(--muted)" : "var(--text)",fontFamily:"var(--ff-heading)",textDecoration: isClosed ? "line-through" : "none"}}>{listing.name}</div>
-            {isBeenThere && <span style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"#8ABA8A",background:"#1A2A1A",padding:"1px 6px",borderRadius:3,flexShrink:0}}>👣 been</span>}
+            {isBeenThere && <span style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"#3A7A3A",background:"#C4E8C4",padding:"1px 6px",borderRadius:3,flexShrink:0}}>👣 been</span>}
           </div>
           <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
             <CategoryBadge category={listing.category} compact/>
@@ -441,7 +441,7 @@ const ListingCard = ({ listing, isSelected, isFavorite, isRouteStop, routeIndex,
           </div>
         </div>
         <div style={{display:"flex",gap:4,marginLeft:8,flexShrink:0}}>
-          <button onClick={e=>{e.stopPropagation();onFavorite(listing.id);}} style={{width:28,height:28,borderRadius:6,border:"1px solid var(--border)",cursor:"pointer",background:isFavorite?"#D4A57422":"transparent",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <button onClick={e=>{e.stopPropagation();onFavorite(listing.id);}} style={{width:28,height:28,borderRadius:6,border:"1px solid var(--border)",cursor:"pointer",background:isFavorite?"#C4922A22":"transparent",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>
             {isFavorite?"❤️":"🤍"}
           </button>
           <button onClick={e=>{e.stopPropagation();onAddRoute(listing.id);}} style={{width:28,height:28,borderRadius:6,border:"1px solid var(--border)",cursor:"pointer",background:isRouteStop?`${cat.color}22`:"transparent",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
@@ -469,7 +469,7 @@ const ListingCard = ({ listing, isSelected, isFavorite, isRouteStop, routeIndex,
               <a
                 href={`https://www.google.com/maps/dir/?api=1&destination=${listing.lat},${listing.lng}&travelmode=driving`}
                 target="_blank" rel="noopener noreferrer"
-                style={{flex:1,padding:"8px 12px",borderRadius:6,border:"none",background:cat.color,color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"var(--ff-heading)",textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center"}}
+                style={{flex:1,padding:"8px 12px",borderRadius:6,border:"none",background:cat.color,color:"#2C1810",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"var(--ff-heading)",textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center"}}
               >🗺️ Get Directions</a>
             ) : (
               <button disabled style={{flex:1,padding:"8px 12px",borderRadius:6,border:"none",background:"var(--border)",color:"var(--muted)",fontSize:12,fontWeight:600,cursor:"default",fontFamily:"var(--ff-heading)"}}>No Location</button>
@@ -499,8 +499,8 @@ const ListingCard = ({ listing, isSelected, isFavorite, isRouteStop, routeIndex,
               <button
                 onClick={e=>{e.stopPropagation(); onToggleBeenThere(listing.id);}}
                 style={{flex:1,padding:"7px 8px",borderRadius:6,fontSize:11,fontFamily:"var(--ff-mono)",cursor:"pointer",
-                  border: isBeenThere ? "1px solid #4A6A4A" : "1px solid var(--border)",
-                  background: isBeenThere ? "#1A2A1A" : "transparent",
+                  border: isBeenThere ? "1px solid #4A8A4A" : "1px solid var(--border)",
+                  background: isBeenThere ? "#D4F0D4" : "transparent",
                   color: isBeenThere ? "#8ABA8A" : "var(--muted)",
                   fontWeight: isBeenThere ? 700 : 400,
                 }}
@@ -509,7 +509,7 @@ const ListingCard = ({ listing, isSelected, isFavorite, isRouteStop, routeIndex,
                 <button
                   onClick={e=>{e.stopPropagation(); onHide(listing.id);}}
                   style={{flex:1,padding:"7px 8px",borderRadius:6,fontSize:11,fontFamily:"var(--ff-mono)",cursor:"pointer",
-                    border:"1px solid #3A3228",background:"#231E18",color:"var(--muted)",
+                    border:"1px solid #D4C4A8",background:"#EDE5D0",color:"var(--muted)",
                   }}
                 >Hide from List 👻</button>
               )}
@@ -520,8 +520,8 @@ const ListingCard = ({ listing, isSelected, isFavorite, isRouteStop, routeIndex,
               <button
                 onClick={e=>{e.stopPropagation(); isClosed ? onClearStatus(listing.id) : onMarkClosed(listing.id);}}
                 style={{flex:1,padding:"6px 8px",borderRadius:6,fontSize:11,fontFamily:"var(--ff-mono)",cursor:"pointer",
-                  border: isClosed ? "1px solid #6A2A2A" : "1px solid var(--border)",
-                  background: isClosed ? "#2A1414" : "transparent",
+                  border: isClosed ? "1px solid #C45A5A" : "1px solid var(--border)",
+                  background: isClosed ? "#F5D4D4" : "transparent",
                   color: isClosed ? "#C86A6A" : "var(--muted)",
                   fontWeight: isClosed ? 700 : 400,
                 }}
@@ -529,8 +529,8 @@ const ListingCard = ({ listing, isSelected, isFavorite, isRouteStop, routeIndex,
               <button
                 onClick={e=>{e.stopPropagation(); isVerify ? onClearStatus(listing.id) : onMarkVerify(listing.id);}}
                 style={{flex:1,padding:"6px 8px",borderRadius:6,fontSize:11,fontFamily:"var(--ff-mono)",cursor:"pointer",
-                  border: isVerify ? "1px solid #6A5A2A" : "1px solid var(--border)",
-                  background: isVerify ? "#2A2414" : "transparent",
+                  border: isVerify ? "1px solid #B8962A" : "1px solid var(--border)",
+                  background: isVerify ? "#F5EDD4" : "transparent",
                   color: isVerify ? "#C8A86A" : "var(--muted)",
                   fontWeight: isVerify ? 700 : 400,
                 }}
@@ -659,7 +659,7 @@ const RoutePanel = ({ stops, listings, onRemove, onClear, onReorder }) => {
           <span style={{fontFamily:"var(--ff-mono)",fontSize:11,color:"var(--muted)",fontWeight:400,marginLeft:6}}>
             ({stops.length} stop{stops.length!==1?"s":""}{totalMiles>0 ? ` · ~${totalMiles.toFixed(0)} mi` : ""})
           </span>
-          {optimized && <span style={{fontFamily:"var(--ff-mono)",fontSize:10,color:"#6A9A6A",marginLeft:8}}>✓ optimized</span>}
+          {optimized && <span style={{fontFamily:"var(--ff-mono)",fontSize:10,color:"#3A7A3A",marginLeft:8}}>✓ optimized</span>}
         </h4>
         <button onClick={onClear} style={{fontSize:11,color:"var(--muted)",background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>Clear</button>
       </div>
@@ -727,7 +727,7 @@ const GroupPanel = ({ groups, routeStops, listings }) => {
   return (
     <div>
       {!routeStops.length && (
-        <div style={{padding:"10px 14px",borderRadius:8,background:"#2A241D",border:"1px dashed var(--border)",marginBottom:12,fontSize:12,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>
+        <div style={{padding:"10px 14px",borderRadius:8,background:"#E8DECE",border:"1px dashed var(--border)",marginBottom:12,fontSize:12,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>
           📍 Pin stops on the map to build a route, then share it here.
         </div>
       )}
@@ -742,7 +742,7 @@ const GroupPanel = ({ groups, routeStops, listings }) => {
             </div>
             <button
               onClick={()=>handleShareRoute(g)}
-              style={{padding:"4px 10px",borderRadius:6,border:`1px solid ${shared===g.id?"#6A9A6A":g.color}`,background:shared===g.id?"#1A2A1A":"transparent",color:shared===g.id?"#6A9A6A":g.color,fontSize:11,cursor:"pointer",transition:"all 0.2s",fontFamily:"var(--ff-mono)"}}
+              style={{padding:"4px 10px",borderRadius:6,border:`1px solid ${shared===g.id?"#6A9A6A":g.color}`,background:shared===g.id?"#D4F0D4":"transparent",color:shared===g.id?"#6A9A6A":g.color,fontSize:11,cursor:"pointer",transition:"all 0.2s",fontFamily:"var(--ff-mono)"}}
             >
               {shared===g.id ? "✓ Sent!" : "Share Route"}
             </button>
@@ -811,14 +811,14 @@ const LoadScreen = ({ onLoad }) => {
 
   return (
     <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24,padding:32,background:"var(--bg)"}}>
-      <h1 style={{fontFamily:"'Playfair Display',Georgia,serif",fontSize:40,fontWeight:900,background:"linear-gradient(135deg,#E8DDD0 0%,#D4A574 100%)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Fade & Find</h1>
+      <h1 style={{fontFamily:"'Playfair Display',Georgia,serif",fontSize:40,fontWeight:900,background:"linear-gradient(135deg,#2C1810 0%,#C4922A 100%)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Fade & Find</h1>
       <p style={{fontFamily:"monospace",fontSize:11,color:"var(--muted)",letterSpacing:"0.15em",textTransform:"uppercase"}}>Where forgotten things find new homes.</p>
       <div style={{maxWidth:340,width:"100%",padding:24,background:"var(--card-bg)",borderRadius:12,border:"1px solid var(--border)",textAlign:"center"}}>
         <div style={{fontSize:32,marginBottom:12}}>📂</div>
         <p style={{fontSize:13,color:"var(--text)",lineHeight:1.6,marginBottom:20}}>
           Load your <strong style={{color:"var(--accent)"}}>fadeandfind_listings.json</strong> file to see live listings on the map.
         </p>
-        <label style={{display:"block",padding:"12px 20px",borderRadius:8,background:"var(--accent)",color:"#1A1611",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Playfair Display',Georgia,serif"}}>
+        <label style={{display:"block",padding:"12px 20px",borderRadius:8,background:"var(--accent)",color:"#F5EFE0",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Playfair Display',Georgia,serif"}}>
           📍 Load Listings File
           <input type="file" accept=".json" onChange={handleFile} style={{display:"none"}}/>
         </label>
@@ -936,11 +936,11 @@ function FadeAndFind() {
   };
 
   const cssVars = {
-    "--bg":"#1A1611","--card-bg":"#231E18","--card-active":"#2C261E",
-    "--text":"#E8DDD0","--muted":"#8A7E6F","--accent":"#D4A574",
-    "--accent-bg":"#D4A57418","--border":"#3A3228","--grid":"#2A2418",
-    "--map-bg":"linear-gradient(135deg,#1E1914 0%,#242019 50%,#1A1611 100%)",
-    "--tag-bg":"#2A241D","--tag-text":"#A89880",
+    "--bg":"#F5EFE0","--card-bg":"#EDE5D0","--card-active":"#E4D9C0",
+    "--text":"#2C1810","--muted":"#8A7A65","--accent":"#C4922A",
+    "--accent-bg":"#C4922A18","--border":"#D4C4A8","--grid":"#E8DECE",
+    "--map-bg":"linear-gradient(135deg,#F0E8D4 0%,#EDE5D0 50%,#F5EFE0 100%)",
+    "--tag-bg":"#E8DECE","--tag-text":"#6A5A42",
     "--ff-heading":"'Playfair Display',Georgia,serif",
     "--ff-body":"'Source Sans 3','Source Sans Pro',system-ui,sans-serif",
     "--ff-mono":"'JetBrains Mono','Fira Code',monospace",
@@ -1023,9 +1023,9 @@ function FadeAndFind() {
       <header style={{padding:"16px 20px 12px",position:"relative",zIndex:10,borderBottom:"1px solid var(--border)"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
           <div>
-            <h1 style={{fontFamily:"var(--ff-heading)",fontSize:26,fontWeight:900,margin:0,letterSpacing:"-0.02em",background:"linear-gradient(135deg,#E8DDD0 0%,#D4A574 100%)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Fade & Find</h1>
+            <h1 style={{fontFamily:"var(--ff-heading)",fontSize:26,fontWeight:900,margin:0,letterSpacing:"-0.02em",background:"linear-gradient(135deg,#2C1810 0%,#C4922A 100%)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Fade & Find</h1>
             <p style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"var(--muted)",letterSpacing:"0.15em",textTransform:"uppercase",marginTop:2}}>Where forgotten things find new homes.</p>
-            <p style={{fontSize:9,fontFamily:"var(--ff-mono)",color:"#6A9A6A",letterSpacing:"0.1em",textTransform:"uppercase",marginTop:2}}>
+            <p style={{fontSize:9,fontFamily:"var(--ff-mono)",color:"#3A7A3A",letterSpacing:"0.1em",textTransform:"uppercase",marginTop:2}}>
               ● Live · {liveListings.length} listings · {loadedFrom}
             </p>
           </div>
@@ -1034,7 +1034,7 @@ function FadeAndFind() {
             <div
               title={`Signed in as ${user?.email}\nClick to sign out`}
               onClick={async()=>{ if(window.confirm("Sign out?")){ await db.auth.signOut(); setUser(null); }}}
-              style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#D4A574,#8B6F47)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:"#1A1611",cursor:"pointer"}}
+              style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#C4922A,#8B6F47)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:"#F5EFE0",cursor:"pointer"}}
             >{userInitial}</div>
           </div>
         </div>
@@ -1081,7 +1081,7 @@ function FadeAndFind() {
                 )}
               </div>
               <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                {flaggedInView.length > 0 && <span style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"#C8856A",background:"#2A1E1A",padding:"2px 8px",borderRadius:4}}>🚩 {flaggedInView.length} filtered</span>}
+                {flaggedInView.length > 0 && <span style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"#C8856A",background:"#F0E4D4",padding:"2px 8px",borderRadius:4}}>🚩 {flaggedInView.length} filtered</span>}
                 {filters.maxDistance<200 && <span style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"var(--accent)",background:"var(--accent-bg)",padding:"2px 8px",borderRadius:4}}>within {filters.maxDistance}mi</span>}
               </div>
             </div>
@@ -1090,8 +1090,8 @@ function FadeAndFind() {
                 <ListingCard key={l.id} listing={l} isSelected={selectedId===l.id} isFavorite={favorites.includes(l.id)} isRouteStop={routeStops.includes(l.id)} routeIndex={routeStops.indexOf(l.id)} onSelect={setSelectedId} onFavorite={toggleFavorite} onAddRoute={toggleRouteStop} onUnflag={handleUnflag} isClosed={closedIds.has(l.id)} isVerify={verifyIds.has(l.id)} onMarkClosed={markClosed} onMarkVerify={markVerify} onClearStatus={clearStatus} isBeenThere={beenThereIds.has(l.id)} onToggleBeenThere={toggleBeenThere} onHide={hideId}/>
               ))}
               {flaggedInView.length > 0 && (
-                <div style={{marginTop:12,paddingTop:10,borderTop:"1px dashed #3A2A20"}}>
-                  <p style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"#6A4A38",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:8}}>Auto-filtered · tap Keep to restore</p>
+                <div style={{marginTop:12,paddingTop:10,borderTop:"1px dashed #C4B49A"}}>
+                  <p style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"#8A6A50",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:8}}>Auto-filtered · tap Keep to restore</p>
                   {flaggedInView.map(l=>(
                     <ListingCard key={l.id} listing={l} isSelected={false} isFavorite={false} isRouteStop={false} routeIndex={-1} onSelect={()=>{}} onFavorite={()=>{}} onAddRoute={()=>{}} onUnflag={handleUnflag} isClosed={false} isVerify={false} onMarkClosed={()=>{}} onMarkVerify={()=>{}} onClearStatus={()=>{}}/>
                   ))}
