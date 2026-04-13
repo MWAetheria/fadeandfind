@@ -764,7 +764,7 @@ const LoadScreen = ({ onLoad }) => {
 };
 
 // ── MAIN APP ──────────────────────────────────────────
-function Fade & Find() {
+function FadeAndFind() {
   const [liveListings, setLiveListings]   = useState(null); // null = not loaded yet
   const [loadedFrom,   setLoadedFrom]     = useState("");
   const [selectedId,   setSelectedId]     = useState(null);
@@ -998,7 +998,7 @@ function Fade & Find() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<Fade & Find/>);
+ReactDOM.createRoot(document.getElementById("root")).render(<FadeAndFind/>);
 </script>
 </body>
 </html>
