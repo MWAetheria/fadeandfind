@@ -1222,14 +1222,14 @@ function FadeAndFind() {
         <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(44,24,16,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
           <div style={{background:"var(--bg)",borderRadius:14,padding:4,width:"100%",maxWidth:400,position:"relative",boxShadow:"0 8px 40px rgba(0,0,0,0.2)"}}>
             <button onClick={()=>setShowAuthModal(false)} style={{position:"absolute",top:12,right:12,width:28,height:28,borderRadius:"50%",border:"1px solid var(--border)",background:"var(--card-bg)",cursor:"pointer",fontSize:14,color:"var(--muted)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1}}>✕</button>
-            <AuthScreen onAuth={(u)=>{ setUser(u); setShowAuthModal(false); }}/>
+            <AuthScreen onAuth={(u)=>{ setShowAuthModal(false); setUser(u); }}/>
           </div>
         </div>
       )}
 
       {/* ── Guest banner ── */}
-      {isGuest && (
-        <div style={{background:"var(--accent)",padding:"8px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+      {!user && (
+        <div style={{background:"var(--accent)",padding:"8px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,transition:"all 0.3s ease"}}>
           <span style={{fontSize:12,color:"#F5EFE0",fontFamily:"var(--ff-mono)"}}>👋 You're browsing as a guest — favorites & routes won't be saved.</span>
           <button onClick={()=>setShowAuthModal(true)} style={{fontSize:11,fontWeight:700,color:"var(--accent)",background:"#F5EFE0",border:"none",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontFamily:"var(--ff-mono)",whiteSpace:"nowrap"}}>Sign Up Free</button>
         </div>
@@ -1247,7 +1247,7 @@ function FadeAndFind() {
           </div>
           <div style={{display:"flex",gap:6,alignItems:"center"}}>
             <div style={{width:36,height:36,borderRadius:8,background:"var(--card-bg)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,cursor:"pointer"}}>🔔</div>
-            {isGuest ? (
+            {!user ? (
               <button onClick={()=>setShowAuthModal(true)} style={{height:36,padding:"0 12px",borderRadius:18,background:"var(--accent)",border:"none",color:"#F5EFE0",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"var(--ff-mono)",whiteSpace:"nowrap"}}>Sign In</button>
             ) : (
               <div
