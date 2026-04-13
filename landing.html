@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Fade & Find — Where Forgotten Things Find New Homes</title>
+  <meta name="description" content="Discover estate sales, antique stores, auctions, and flea markets near you. Plan your route, save favorites, and hunt smarter."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #F5EFE0;
+      --card:      #EDE5D0;
+      --text:      #2C1810;
+      --muted:     #8A7A65;
+      --accent:    #C4922A;
+      --accent2:   #8B4513;
+      --border:    #D4C4A8;
+      --cream:     #FAF6EE;
+      --ff-head:   'Playfair Display', Georgia, serif;
+      --ff-body:   'DM Sans', system-ui, sans-serif;
+      --ff-mono:   'DM Mono', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--ff-body);
+      font-weight: 400;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── Texture overlay ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.6;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 40px;
+      background: rgba(245,239,224,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      font-family: var(--ff-head);
+      font-size: 22px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #2C1810 0%, #C4922A 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      font-size: 14px;
+      color: var(--muted);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--text); }
+
+    .btn-nav {
+      padding: 9px 22px;
+      border-radius: 100px;
+      background: var(--accent);
+      color: #FAF6EE;
+      font-size: 14px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+
+    .btn-nav:hover { opacity: 0.88; transform: translateY(-1px); }
+
+    /* ── Hero ── */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 120px 24px 80px;
+      overflow: hidden;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      border-radius: 100px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      font-size: 12px;
+      font-family: var(--ff-mono);
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+      animation: fadeUp 0.6s ease both;
+    }
+
+    .hero-badge span { color: var(--accent); }
+
+    .hero h1 {
+      font-family: var(--ff-head);
+      font-size: clamp(48px, 8vw, 96px);
+      font-weight: 900;
+      line-height: 1.0;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+      animation: fadeUp 0.6s 0.1s ease both;
+    }
+
+    .hero h1 em {
+      font-style: italic;
+      background: linear-gradient(135deg, #C4922A 0%, #8B4513 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-sub {
+      font-family: var(--ff-head);
+      font-size: clamp(18px, 3vw, 26px);
+      font-weight: 400;
+      font-style: italic;
+      color: var(--muted);
+      margin-bottom: 40px;
+      animation: fadeUp 0.6s 0.2s ease both;
+    }
+
+    .hero-desc {
+      font-size: 17px;
+      color: var(--muted);
+      max-width: 520px;
+      margin: 0 auto 48px;
+      line-height: 1.7;
+      animation: fadeUp 0.6s 0.3s ease both;
+    }
+
+    .hero-ctas {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      flex-wrap: wrap;
+      animation: fadeUp 0.6s 0.4s ease both;
+    }
+
+    .btn-primary {
+      padding: 16px 36px;
+      border-radius: 100px;
+      background: var(--accent);
+      color: #FAF6EE;
+      font-size: 16px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.2s;
+      box-shadow: 0 4px 20px rgba(196,146,42,0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(196,146,42,0.4);
+    }
+
+    .btn-secondary {
+      padding: 16px 36px;
+      border-radius: 100px;
+      border: 1.5px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: var(--card);
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    /* Decorative map pins */
+    .hero-pins {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .pin {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      opacity: 0.12;
+      animation: float 6s ease-in-out infinite;
+    }
+
+    .pin:nth-child(1) { background: var(--accent); top: 15%; left: 8%; animation-delay: 0s; }
+    .pin:nth-child(2) { background: #8B4513; top: 25%; right: 10%; width: 32px; height: 32px; animation-delay: 1.5s; }
+    .pin:nth-child(3) { background: var(--accent); bottom: 30%; left: 12%; width: 24px; height: 24px; animation-delay: 3s; }
+    .pin:nth-child(4) { background: #8B4513; bottom: 20%; right: 8%; animation-delay: 0.8s; }
+    .pin:nth-child(5) { background: var(--accent); top: 60%; left: 5%; width: 20px; height: 20px; animation-delay: 2s; }
+
+    .hero-scroll {
+      position: absolute;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-family: var(--ff-mono);
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      animation: fadeUp 0.6s 0.8s ease both;
+    }
+
+    .scroll-line {
+      width: 1px;
+      height: 40px;
+      background: linear-gradient(to bottom, var(--muted), transparent);
+      animation: scrollPulse 2s ease-in-out infinite;
+    }
+
+    /* ── Stats bar ── */
+    .stats {
+      position: relative;
+      z-index: 1;
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 32px 40px;
+      display: flex;
+      justify-content: center;
+      gap: 80px;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-num {
+      font-family: var(--ff-head);
+      font-size: 36px;
+      font-weight: 900;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: var(--muted);
+      font-family: var(--ff-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-top: 4px;
+    }
+
+    /* ── Sections ── */
+    section {
+      position: relative;
+      z-index: 1;
+      padding: 100px 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-family: var(--ff-mono);
+      font-size: 11px;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .section-title {
+      font-family: var(--ff-head);
+      font-size: clamp(32px, 5vw, 52px);
+      font-weight: 900;
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+      margin-bottom: 16px;
+    }
+
+    .section-title em {
+      font-style: italic;
+      color: var(--accent);
+    }
+
+    .section-desc {
+      font-size: 17px;
+      color: var(--muted);
+      max-width: 560px;
+      line-height: 1.7;
+      margin-bottom: 64px;
+    }
+
+    /* ── How it works ── */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+
+    .step {
+      padding: 36px 32px;
+      background: var(--card);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      position: relative;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .step:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(44,24,16,0.08);
+    }
+
+    .step-num {
+      font-family: var(--ff-head);
+      font-size: 64px;
+      font-weight: 900;
+      color: var(--border);
+      line-height: 1;
+      margin-bottom: 16px;
+    }
+
+    .step h3 {
+      font-family: var(--ff-head);
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .step p {
+      font-size: 15px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* ── Features ── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    .feature {
+      padding: 28px;
+      background: var(--card);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      transition: transform 0.2s;
+    }
+
+    .feature:hover { transform: translateY(-3px); }
+
+    .feature-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #C4922A22, #C4922A44);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+
+    .feature h4 {
+      font-family: var(--ff-head);
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .feature p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    /* ── Pricing ── */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+      max-width: 780px;
+      margin: 0 auto;
+    }
+
+    .pricing-card {
+      padding: 40px 36px;
+      border-radius: 20px;
+      border: 1.5px solid var(--border);
+      background: var(--card);
+      position: relative;
+      transition: transform 0.2s;
+    }
+
+    .pricing-card:hover { transform: translateY(-4px); }
+
+    .pricing-card.featured {
+      border-color: var(--accent);
+      background: linear-gradient(145deg, #EDE5D0, #E8DBC8);
+      box-shadow: 0 8px 40px rgba(196,146,42,0.15);
+    }
+
+    .pricing-badge {
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--accent);
+      color: #FAF6EE;
+      font-size: 11px;
+      font-family: var(--ff-mono);
+      font-weight: 500;
+      padding: 4px 14px;
+      border-radius: 100px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      white-space: nowrap;
+    }
+
+    .pricing-tier {
+      font-family: var(--ff-mono);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .pricing-price {
+      font-family: var(--ff-head);
+      font-size: 52px;
+      font-weight: 900;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .pricing-price sup {
+      font-size: 24px;
+      vertical-align: top;
+      margin-top: 10px;
+    }
+
+    .pricing-cadence {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 32px;
+    }
+
+    .pricing-features {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 36px;
+    }
+
+    .pricing-features li {
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pricing-features li::before {
+      content: '✓';
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #FAF6EE;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-weight: 700;
+    }
+
+    .pricing-features li.locked {
+      color: var(--muted);
+    }
+
+    .pricing-features li.locked::before {
+      content: '—';
+      background: var(--border);
+      color: var(--muted);
+    }
+
+    .btn-pricing {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      border-radius: 100px;
+      text-align: center;
+      font-size: 15px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .btn-pricing-free {
+      border: 1.5px solid var(--border);
+      color: var(--text);
+    }
+
+    .btn-pricing-free:hover {
+      border-color: var(--accent);
+      background: var(--bg);
+    }
+
+    .btn-pricing-paid {
+      background: var(--accent);
+      color: #FAF6EE;
+      box-shadow: 0 4px 16px rgba(196,146,42,0.25);
+    }
+
+    .btn-pricing-paid:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(196,146,42,0.35);
+    }
+
+    /* ── Coming soon feature ── */
+    .appraiser {
+      position: relative;
+      z-index: 1;
+      margin: 0 auto;
+      max-width: 1100px;
+      padding: 0 24px 100px;
+    }
+
+    .appraiser-card {
+      background: linear-gradient(135deg, #2C1810 0%, #4A2C1A 100%);
+      border-radius: 24px;
+      padding: 64px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .appraiser-card::before {
+      content: '';
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 300px; height: 300px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(196,146,42,0.2), transparent 70%);
+    }
+
+    .appraiser-label {
+      font-family: var(--ff-mono);
+      font-size: 11px;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .appraiser-label::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .appraiser h2 {
+      font-family: var(--ff-head);
+      font-size: clamp(28px, 4vw, 44px);
+      font-weight: 900;
+      color: #FAF6EE;
+      line-height: 1.1;
+      margin-bottom: 20px;
+    }
+
+    .appraiser h2 em {
+      font-style: italic;
+      color: var(--accent);
+    }
+
+    .appraiser p {
+      font-size: 16px;
+      color: rgba(250,246,238,0.7);
+      line-height: 1.7;
+    }
+
+    .appraiser-demo {
+      background: rgba(250,246,238,0.06);
+      border: 1px solid rgba(250,246,238,0.12);
+      border-radius: 16px;
+      padding: 28px;
+    }
+
+    .appraiser-demo-item {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+
+    .appraiser-demo-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: rgba(196,146,42,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .appraiser-demo-text h5 {
+      font-size: 13px;
+      font-weight: 500;
+      color: #FAF6EE;
+      margin-bottom: 3px;
+    }
+
+    .appraiser-demo-text p {
+      font-size: 12px;
+      color: rgba(250,246,238,0.5);
+      line-height: 1.4;
+    }
+
+    /* ── CTA Section ── */
+    .cta-section {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 100px 24px;
+      background: var(--card);
+      border-top: 1px solid var(--border);
+    }
+
+    .cta-section h2 {
+      font-family: var(--ff-head);
+      font-size: clamp(32px, 5vw, 56px);
+      font-weight: 900;
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+
+    .cta-section h2 em {
+      font-style: italic;
+      color: var(--accent);
+    }
+
+    .cta-section p {
+      font-size: 17px;
+      color: var(--muted);
+      margin-bottom: 40px;
+      max-width: 480px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* ── Footer ── */
+    footer {
+      position: relative;
+      z-index: 1;
+      background: #2C1810;
+      color: rgba(250,246,238,0.6);
+      padding: 48px 40px 32px;
+    }
+
+    .footer-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 40px;
+      flex-wrap: wrap;
+      margin-bottom: 40px;
+    }
+
+    .footer-brand .logo {
+      font-family: var(--ff-head);
+      font-size: 24px;
+      font-weight: 900;
+      color: #FAF6EE;
+      margin-bottom: 8px;
+    }
+
+    .footer-brand p {
+      font-size: 13px;
+      font-style: italic;
+      color: rgba(250,246,238,0.5);
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .footer-links a {
+      font-size: 13px;
+      color: rgba(250,246,238,0.5);
+      text-decoration: none;
+      transition: color 0.2s;
+      font-family: var(--ff-mono);
+    }
+
+    .footer-links a:hover { color: var(--accent); }
+
+    .footer-bottom {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding-top: 24px;
+      border-top: 1px solid rgba(250,246,238,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-family: var(--ff-mono);
+      color: rgba(250,246,238,0.3);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: rotate(-45deg) translateY(0); }
+      50%       { transform: rotate(-45deg) translateY(-12px); }
+    }
+
+    @keyframes scrollPulse {
+      0%, 100% { opacity: 0.4; transform: scaleY(1); }
+      50%       { opacity: 1;   transform: scaleY(1.2); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; transform: scale(1); }
+      50%       { opacity: 1;   transform: scale(1.3); }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      nav { padding: 14px 20px; }
+      .nav-links { display: none; }
+      .stats { gap: 40px; padding: 28px 20px; }
+      section { padding: 64px 20px; }
+      .appraiser-card { grid-template-columns: 1fr; padding: 36px 28px; }
+      .appraiser-card::before { display: none; }
+      .footer-inner { flex-direction: column; gap: 24px; }
+      .footer-bottom { flex-direction: column; text-align: center; }
+    }
+
+    /* ── Divider ── */
+    .divider {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      height: 1px;
+      background: var(--border);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <a href="/" class="nav-logo">Fade & Find</a>
+    <ul class="nav-links">
+      <li><a href="#how-it-works">How it works</a></li>
+      <li><a href="#features">Features</a></li>
+      <li><a href="#pricing">Pricing</a></li>
+      <li><a href="/app" class="btn-nav">Open App →</a></li>
+    </ul>
+  </nav>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-pins">
+      <div class="pin"></div>
+      <div class="pin"></div>
+      <div class="pin"></div>
+      <div class="pin"></div>
+      <div class="pin"></div>
+    </div>
+
+    <div class="hero-badge">🗺️ Now live — <span>estate sales, antiques & auctions near you</span></div>
+
+    <h1>The <em>Saturday morning</em><br/>treasure hunt, upgraded.</h1>
+    <p class="hero-sub">Where forgotten things find new homes.</p>
+    <p class="hero-desc">Fade & Find puts every estate sale, antique store, flea market, and auction in your area on one beautiful map — then helps you plan the perfect route.</p>
+
+    <div class="hero-ctas">
+      <a href="/app" class="btn-primary">Start Hunting Free →</a>
+      <a href="#how-it-works" class="btn-secondary">See how it works</a>
+    </div>
+
+    <div class="hero-scroll">
+      <div class="scroll-line"></div>
+      Scroll
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-num">5+</div>
+      <div class="stat-label">Venue Types</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">Free</div>
+      <div class="stat-label">To Get Started</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">1-tap</div>
+      <div class="stat-label">Route Planning</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">Live</div>
+      <div class="stat-label">Listing Data</div>
+    </div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <section id="how-it-works">
+    <span class="section-label">How it works</span>
+    <h2 class="section-title">Three steps to your<br/><em>best Saturday ever.</em></h2>
+    <p class="section-desc">No more bouncing between apps or scribbling addresses on scraps of paper. Fade & Find brings it all together.</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <h3>Find everything nearby</h3>
+        <p>Open the app, allow location, and instantly see estate sales, antique stores, auctions, flea markets, and thrift stores on one live map.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <h3>Build your route</h3>
+        <p>Pin the spots that look promising. Fade & Find automatically optimizes your stops into the most efficient driving order — then hands it off to Google Maps.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <h3>Hunt smarter</h3>
+        <p>Track where you've been, save favorites, flag closed businesses, and share your route with your crew. Every run gets better than the last.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- FEATURES -->
+  <section id="features">
+    <span class="section-label">Features</span>
+    <h2 class="section-title">Everything a serious<br/><em>picker needs.</em></h2>
+    <p class="section-desc">Built by someone who actually does this every Saturday. Every feature comes from a real frustration with existing tools.</p>
+
+    <div class="features-grid">
+      <div class="feature">
+        <div class="feature-icon">🗺️</div>
+        <div>
+          <h4>Live Map</h4>
+          <p>Estate sales, antique stores, auctions, flea markets, thrift stores, and boutiques — all in one place, updated regularly.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🧭</div>
+        <div>
+          <h4>Route Optimizer</h4>
+          <p>Pick your stops in any order. We figure out the most efficient driving sequence and open it in Google Maps ready to navigate.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">❤️</div>
+        <div>
+          <h4>Favorites & Saved Lists</h4>
+          <p>Save the places worth returning to. Your list syncs across devices so you never lose a good find.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">👣</div>
+        <div>
+          <h4>Been There Tracker</h4>
+          <p>Mark places you've visited so you stop walking into the same antique store twice wondering if you've been there before.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🚫</div>
+        <div>
+          <h4>Community Reports</h4>
+          <p>Mark businesses as closed or flag them for verification. Keeps the map accurate for everyone.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">👥</div>
+        <div>
+          <h4>Group Sharing</h4>
+          <p>Planning a run with family or friends? Share your full route — stops, addresses, and Maps link — in one tap.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔔</div>
+        <div>
+          <h4>Alerts <span style="font-size:11px;background:#C4922A22;color:#C4922A;padding:2px 6px;border-radius:4px;font-family:var(--ff-mono)">Premium</span></h4>
+          <p>Get notified when new estate sales drop in your zip code, so you're never the last to know.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">⏰</div>
+        <div>
+          <h4>Early Access <span style="font-size:11px;background:#C4922A22;color:#C4922A;padding:2px 6px;border-radius:4px;font-family:var(--ff-mono)">Premium</span></h4>
+          <p>See new estate sale listings 24 hours before they go public on EstateSales.NET. First dibs, always.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- PRICING -->
+  <section id="pricing" style="text-align:center;">
+    <span class="section-label">Pricing</span>
+    <h2 class="section-title">Start free.<br/><em>Upgrade when you're hooked.</em></h2>
+    <p class="section-desc" style="margin:0 auto 64px;">No credit card required to get started. Upgrade anytime for the full treasure hunting toolkit.</p>
+
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <div class="pricing-tier">Free</div>
+        <div class="pricing-price">$0</div>
+        <div class="pricing-cadence">forever</div>
+        <ul class="pricing-features">
+          <li>Live map with all venue types</li>
+          <li>Basic filters & search</li>
+          <li>Favorites & saved listings</li>
+          <li>Basic route planning</li>
+          <li>Been There tracker</li>
+          <li>Community reports</li>
+          <li class="locked">Route optimization</li>
+          <li class="locked">Group sharing</li>
+          <li class="locked">Alerts & notifications</li>
+          <li class="locked">24hr early access</li>
+        </ul>
+        <a href="/app" class="btn-pricing btn-pricing-free">Get Started Free</a>
+      </div>
+
+      <div class="pricing-card featured">
+        <div class="pricing-badge">Most Popular</div>
+        <div class="pricing-tier">Premium</div>
+        <div class="pricing-price"><sup>$</sup>4<span style="font-size:28px">.99</span></div>
+        <div class="pricing-cadence">per month · or $39.99/year (save 33%)</div>
+        <ul class="pricing-features">
+          <li>Everything in Free</li>
+          <li>Route optimization</li>
+          <li>Group sharing & collaboration</li>
+          <li>New listing alerts</li>
+          <li>Tag search & filters</li>
+          <li>Been-there archive</li>
+          <li>24hr early access to sales</li>
+          <li>Priority support</li>
+        </ul>
+        <a href="/app" class="btn-pricing btn-pricing-paid">Start Free Trial</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- THE APPRAISER -->
+  <div class="appraiser">
+    <div class="appraiser-card">
+      <div>
+        <div class="appraiser-label">Coming Soon · Premium Feature</div>
+        <h2>Meet <em>The Appraiser.</em></h2>
+        <p>Snap a photo of anything you find — a piece of furniture, a painting, a piece of pottery — and get instant AI-powered identification, estimated value, era, and tips on where to sell it. Your personal expert in your pocket.</p>
+      </div>
+      <div class="appraiser-demo">
+        <div class="appraiser-demo-item">
+          <div class="appraiser-demo-icon">📸</div>
+          <div class="appraiser-demo-text">
+            <h5>Snap a photo</h5>
+            <p>Point your camera at any item you find</p>
+          </div>
+        </div>
+        <div class="appraiser-demo-item">
+          <div class="appraiser-demo-icon">🔍</div>
+          <div class="appraiser-demo-text">
+            <h5>Instant identification</h5>
+            <p>Era, maker, style, and authenticity markers</p>
+          </div>
+        </div>
+        <div class="appraiser-demo-item">
+          <div class="appraiser-demo-icon">💰</div>
+          <div class="appraiser-demo-text">
+            <h5>Value estimate</h5>
+            <p>Market price range and where to sell</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta-section">
+    <h2>Ready to find your<br/><em>next great score?</em></h2>
+    <p>Join treasure hunters already using Fade & Find to plan smarter Saturday runs.</p>
+    <a href="/app" class="btn-primary">Start Hunting Free →</a>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <div class="logo">Fade & Find</div>
+        <p>Where forgotten things find new homes.</p>
+      </div>
+      <div class="footer-links">
+        <a href="/app">Open App</a>
+        <a href="#pricing">Pricing</a>
+        <a href="/terms">Terms of Service</a>
+        <a href="/privacy">Privacy Policy</a>
+        <a href="mailto:support@fadeandfind.com">Contact</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Fade & Find. All rights reserved.</span>
+      <span>Built with ❤️ for pickers everywhere.</span>
+    </div>
+  </footer>
+
+</body>
+</html>
