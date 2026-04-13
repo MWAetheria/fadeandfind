@@ -33,7 +33,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 // ── Supabase client ───────────────────────────────────
 const SUPA_URL = "https://dmriqhvmsfxujwiizigg.supabase.co";
 const SUPA_KEY = "sb_publishable_wpboEhLjq2kpfnTkS90nhA_2guN8FZr";
-const supabase = supabaseJs.createClient(SUPA_URL, SUPA_KEY);
+const db = supabase.createClient(SUPA_URL, SUPA_KEY);
 
 // ── Auth Screen ───────────────────────────────────────
 const AuthScreen = ({ onAuth }) => {
@@ -48,9 +48,9 @@ const AuthScreen = ({ onAuth }) => {
     try {
       let result;
       if (mode === "login") {
-        result = await supabase.auth.signInWithPassword({ email, password });
+        result = await db.auth.signInWithPassword({ email, password });
       } else {
-        result = await supabase.auth.signUp({ email, password });
+        result = await db.auth.signUp({ email, password });
       }
       if (result.error) { setError(result.error.message); }
       else { onAuth(result.data.user); }
@@ -87,7 +87,7 @@ const AuthScreen = ({ onAuth }) => {
         <p style={{textAlign:"center",marginTop:8,fontSize:11,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>
           <span onClick={async()=>{
             if(!email){setError("Enter your email first");return;}
-            const {error} = await supabase.auth.resetPasswordForEmail(email);
+            const {error} = await db.auth.resetPasswordForEmail(email);
             if(error) setError(error.message); else setError("Check your email for a reset link.");
           }} style={{cursor:"pointer",textDecoration:"underline"}}>Forgot password?</span>
         </p>
@@ -860,11 +860,11 @@ function FadeAndFind() {
 
   // ── Check existing session on mount ──
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    db.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setAuthChecked(true);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = db.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
     return () => subscription.unsubscribe();
@@ -873,7 +873,7 @@ function FadeAndFind() {
   // ── Load user data from Supabase when user logs in ──
   useEffect(() => {
     if (!user) return;
-    supabase.from("user_data").select("*").eq("user_id", user.id).single()
+    db.from("user_data").select("*").eq("user_id", user.id).single()
       .then(({ data }) => {
         if (data) {
           setFavorites(data.favorites || []);
@@ -889,11 +889,11 @@ function FadeAndFind() {
   // ── Save user data to Supabase ──
   const saveToSupabase = useCallback(async (patch) => {
     if (!user) return;
-    const { data: existing } = await supabase.from("user_data").select("id").eq("user_id", user.id).single();
+    const { data: existing } = await db.from("user_data").select("id").eq("user_id", user.id).single();
     if (existing) {
-      await supabase.from("user_data").update({ ...patch, updated_at: new Date().toISOString() }).eq("user_id", user.id);
+      await db.from("user_data").update({ ...patch, updated_at: new Date().toISOString() }).eq("user_id", user.id);
     } else {
-      await supabase.from("user_data").insert({ user_id: user.id, ...patch });
+      await db.from("user_data").insert({ user_id: user.id, ...patch });
     }
   }, [user]);
 
@@ -1033,7 +1033,7 @@ function FadeAndFind() {
             <div style={{width:36,height:36,borderRadius:8,background:"var(--card-bg)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,cursor:"pointer"}}>🔔</div>
             <div
               title={`Signed in as ${user?.email}\nClick to sign out`}
-              onClick={async()=>{ if(window.confirm("Sign out?")){ await supabase.auth.signOut(); setUser(null); }}}
+              onClick={async()=>{ if(window.confirm("Sign out?")){ await db.auth.signOut(); setUser(null); }}}
               style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#D4A574,#8B6F47)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:"#1A1611",cursor:"pointer"}}
             >{userInitial}</div>
           </div>
