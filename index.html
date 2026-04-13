@@ -11,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Source+Sans+3:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #1A1611; }
@@ -28,6 +29,72 @@
 
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+// ── Supabase client ───────────────────────────────────
+const SUPA_URL = "https://dmriqhvmsfxujwiizigg.supabase.co";
+const SUPA_KEY = "sb_publishable_wpboEhLjq2kpfnTkS90nhA_2guN8FZr";
+const supabase = supabaseJs.createClient(SUPA_URL, SUPA_KEY);
+
+// ── Auth Screen ───────────────────────────────────────
+const AuthScreen = ({ onAuth }) => {
+  const [mode, setMode]       = useState("login"); // login | signup
+  const [email, setEmail]     = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError]     = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    setError(""); setLoading(true);
+    try {
+      let result;
+      if (mode === "login") {
+        result = await supabase.auth.signInWithPassword({ email, password });
+      } else {
+        result = await supabase.auth.signUp({ email, password });
+      }
+      if (result.error) { setError(result.error.message); }
+      else { onAuth(result.data.user); }
+    } catch (e) { setError("Something went wrong. Please try again."); }
+    setLoading(false);
+  };
+
+  const inputStyle = {
+    width:"100%", padding:"10px 14px", borderRadius:8, border:"1px solid var(--border)",
+    background:"var(--card-bg)", color:"var(--text)", fontSize:14, outline:"none",
+    fontFamily:"var(--ff-body)", marginBottom:12,
+  };
+
+  return (
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24,padding:32,background:"var(--bg)"}}>
+      <h1 style={{fontFamily:"'Playfair Display',Georgia,serif",fontSize:40,fontWeight:900,background:"linear-gradient(135deg,#E8DDD0 0%,#D4A574 100%)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Fade & Find</h1>
+      <p style={{fontFamily:"monospace",fontSize:11,color:"var(--muted)",letterSpacing:"0.15em",textTransform:"uppercase"}}>Where forgotten things find new homes.</p>
+      <div style={{maxWidth:360,width:"100%",padding:28,background:"var(--card-bg)",borderRadius:12,border:"1px solid var(--border)"}}>
+        <h3 style={{fontFamily:"var(--ff-heading)",fontSize:18,color:"var(--text)",marginBottom:20,textAlign:"center"}}>
+          {mode === "login" ? "Welcome back" : "Create your account"}
+        </h3>
+        <input type="email" placeholder="Email address" value={email} onChange={e=>setEmail(e.target.value)} style={inputStyle}/>
+        <input type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleSubmit()} style={inputStyle}/>
+        {error && <p style={{fontSize:12,color:"#C86A6A",marginBottom:12,fontFamily:"var(--ff-mono)"}}>{error}</p>}
+        <button onClick={handleSubmit} disabled={loading} style={{width:"100%",padding:"12px",borderRadius:8,border:"none",background:"var(--accent)",color:"var(--bg)",fontSize:14,fontWeight:700,cursor:loading?"default":"pointer",fontFamily:"var(--ff-heading)",opacity:loading?0.7:1}}>
+          {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
+        </button>
+        <p style={{textAlign:"center",marginTop:16,fontSize:12,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>
+          {mode === "login" ? "New to Fade & Find? " : "Already have an account? "}
+          <span onClick={()=>{setMode(mode==="login"?"signup":"login");setError("");}} style={{color:"var(--accent)",cursor:"pointer",textDecoration:"underline"}}>
+            {mode === "login" ? "Create account" : "Sign in"}
+          </span>
+        </p>
+        <p style={{textAlign:"center",marginTop:8,fontSize:11,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>
+          <span onClick={async()=>{
+            if(!email){setError("Enter your email first");return;}
+            const {error} = await supabase.auth.resetPasswordForEmail(email);
+            if(error) setError(error.message); else setError("Check your email for a reset link.");
+          }} style={{cursor:"pointer",textDecoration:"underline"}}>Forgot password?</span>
+        </p>
+      </div>
+    </div>
+  );
+};
 
 const CATEGORIES = {
   estate:   { label: "Estate Sales",   icon: "🏠", color: "#D4A574" },
@@ -765,15 +832,17 @@ const LoadScreen = ({ onLoad }) => {
 
 // ── MAIN APP ──────────────────────────────────────────
 function FadeAndFind() {
-  const [liveListings, setLiveListings]   = useState(null); // null = not loaded yet
-  const [loadedFrom,   setLoadedFrom]     = useState("");
-  const [selectedId,   setSelectedId]     = useState(null);
-  const [favorites,    setFavorites]      = useState([]);
-  const [routeStops,   setRouteStops]     = useState([]);
-  const [routeMode,    setRouteMode]      = useState(false);
-  const [showFilters,  setShowFilters]    = useState(false);
-  const [activeTab,    setActiveTab]      = useState("map");
-  const [filters,      setFilters]        = useState({
+  const [user,         setUser]          = useState(null);   // supabase user
+  const [authChecked,  setAuthChecked]   = useState(false);  // finished checking session
+  const [liveListings, setLiveListings]  = useState(null);
+  const [loadedFrom,   setLoadedFrom]    = useState("");
+  const [selectedId,   setSelectedId]    = useState(null);
+  const [favorites,    setFavorites]     = useState([]);
+  const [routeStops,   setRouteStops]    = useState([]);
+  const [routeMode,    setRouteMode]     = useState(false);
+  const [showFilters,  setShowFilters]   = useState(false);
+  const [activeTab,    setActiveTab]     = useState("map");
+  const [filters,      setFilters]       = useState({
     categories: Object.keys(CATEGORIES),
     maxDistance: 200,
     sortBy: "distance",
@@ -784,51 +853,87 @@ function FadeAndFind() {
   const [searchText, setSearchText] = useState("");
   const [mapBounds, setMapBounds] = useState(null);
   const [manuallyKept, setManuallyKept] = useState(new Set());
+  const [closedIds,    setClosedIds]    = useState(new Set());
+  const [verifyIds,    setVerifyIds]    = useState(new Set());
+  const [beenThereIds, setBeenThereIds] = useState(new Set());
+  const [hiddenIds,    setHiddenIds]    = useState(new Set());
 
-  // Closure reports — persisted in localStorage so they survive page reloads
-  const [closedIds,  setClosedIds]  = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem("rr_closed") || "[]")); } catch { return new Set(); }
-  });
-  const [verifyIds, setVerifyIds] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem("rr_verify") || "[]")); } catch { return new Set(); }
-  });
-  const [beenThereIds, setBeenThereIds] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem("rr_been") || "[]")); } catch { return new Set(); }
-  });
-  const [hiddenIds, setHiddenIds] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem("rr_hidden") || "[]")); } catch { return new Set(); }
-  });
+  // ── Check existing session on mount ──
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setAuthChecked(true);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // ── Load user data from Supabase when user logs in ──
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("user_data").select("*").eq("user_id", user.id).single()
+      .then(({ data }) => {
+        if (data) {
+          setFavorites(data.favorites || []);
+          setHiddenIds(new Set(data.hidden_ids || []));
+          setBeenThereIds(new Set(data.been_there_ids || []));
+          setClosedIds(new Set(data.closed_ids || []));
+          setVerifyIds(new Set(data.verify_ids || []));
+          setManuallyKept(new Set(data.manually_kept || []));
+        }
+      });
+  }, [user]);
+
+  // ── Save user data to Supabase ──
+  const saveToSupabase = useCallback(async (patch) => {
+    if (!user) return;
+    const { data: existing } = await supabase.from("user_data").select("id").eq("user_id", user.id).single();
+    if (existing) {
+      await supabase.from("user_data").update({ ...patch, updated_at: new Date().toISOString() }).eq("user_id", user.id);
+    } else {
+      await supabase.from("user_data").insert({ user_id: user.id, ...patch });
+    }
+  }, [user]);
 
   const markClosed = (id) => setClosedIds(prev => {
     const next = new Set(prev); next.add(id);
-    localStorage.setItem("rr_closed", JSON.stringify([...next]));
+    saveToSupabase({ closed_ids: [...next] });
     return next;
   });
   const markVerify = (id) => setVerifyIds(prev => {
     const next = new Set(prev); next.add(id);
-    localStorage.setItem("rr_verify", JSON.stringify([...next]));
+    saveToSupabase({ verify_ids: [...next] });
     return next;
   });
   const clearStatus = (id) => {
-    setClosedIds(prev => { const next = new Set(prev); next.delete(id); localStorage.setItem("rr_closed", JSON.stringify([...next])); return next; });
-    setVerifyIds(prev => { const next = new Set(prev); next.delete(id); localStorage.setItem("rr_verify", JSON.stringify([...next])); return next; });
+    setClosedIds(prev => { const next = new Set(prev); next.delete(id); saveToSupabase({ closed_ids: [...next] }); return next; });
+    setVerifyIds(prev => { const next = new Set(prev); next.delete(id); saveToSupabase({ verify_ids: [...next] }); return next; });
   };
   const toggleBeenThere = (id) => setBeenThereIds(prev => {
     const next = new Set(prev);
     next.has(id) ? next.delete(id) : next.add(id);
-    localStorage.setItem("rr_been", JSON.stringify([...next]));
+    saveToSupabase({ been_there_ids: [...next] });
     return next;
   });
   const hideId = (id) => setHiddenIds(prev => {
     const next = new Set(prev); next.add(id);
-    localStorage.setItem("rr_hidden", JSON.stringify([...next]));
+    saveToSupabase({ hidden_ids: [...next] });
     return next;
   });
   const unhideId = (id) => setHiddenIds(prev => {
     const next = new Set(prev); next.delete(id);
-    localStorage.setItem("rr_hidden", JSON.stringify([...next]));
+    saveToSupabase({ hidden_ids: [...next] });
     return next;
   });
+  const toggleFavoriteWithSync = (id) => {
+    setFavorites(prev => {
+      const next = prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id];
+      saveToSupabase({ favorites: next });
+      return next;
+    });
+  };
 
   const cssVars = {
     "--bg":"#1A1611","--card-bg":"#231E18","--card-active":"#2C261E",
@@ -841,6 +946,24 @@ function FadeAndFind() {
     "--ff-mono":"'JetBrains Mono','Fira Code',monospace",
     fontFamily:"var(--ff-body)",background:"var(--bg)",color:"var(--text)",minHeight:"100vh",position:"relative",
   };
+
+  // Show loading spinner while checking auth
+  if (!authChecked) {
+    return (
+      <div style={{...cssVars, display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh"}}>
+        <p style={{fontFamily:"var(--ff-mono)", color:"var(--muted)", fontSize:12, letterSpacing:"0.1em"}}>Loading...</p>
+      </div>
+    );
+  }
+
+  // Show auth screen if not logged in
+  if (!user) {
+    return (
+      <div style={cssVars}>
+        <AuthScreen onAuth={setUser}/>
+      </div>
+    );
+  }
 
   // Show load screen until user picks a file
   if (liveListings === null) {
@@ -890,8 +1013,9 @@ function FadeAndFind() {
     });
 
   const favoriteListings = liveListings.filter(l => favorites.includes(l.id));
-  const toggleFavorite   = (id) => setFavorites(f => f.includes(id) ? f.filter(x=>x!==id) : [...f,id]);
+  const toggleFavorite   = toggleFavoriteWithSync;
   const toggleRouteStop  = (id) => { setRouteStops(s => s.includes(id) ? s.filter(x=>x!==id) : [...s,id]); if (!routeMode) setRouteMode(true); };
+  const userInitial = user?.email?.[0]?.toUpperCase() || "?";
 
   return (
     <div style={cssVars}>
@@ -905,9 +1029,13 @@ function FadeAndFind() {
               ● Live · {liveListings.length} listings · {loadedFrom}
             </p>
           </div>
-          <div style={{display:"flex",gap:6}}>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
             <div style={{width:36,height:36,borderRadius:8,background:"var(--card-bg)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,cursor:"pointer"}}>🔔</div>
-            <div style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#D4A574,#8B6F47)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:"#1A1611",cursor:"pointer"}}>M</div>
+            <div
+              title={`Signed in as ${user?.email}\nClick to sign out`}
+              onClick={async()=>{ if(window.confirm("Sign out?")){ await supabase.auth.signOut(); setUser(null); }}}
+              style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#D4A574,#8B6F47)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:"#1A1611",cursor:"pointer"}}
+            >{userInitial}</div>
           </div>
         </div>
         <div style={{display:"flex",gap:8}}>
