@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fade & Find</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Source+Sans+3:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #1A1611; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #3A3228; border-radius: 3px; }
+    input::placeholder { color: #6A5E4F; }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes pulse { 0%,100% { opacity:.6 } 50% { opacity:1 } }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+const CATEGORIES = {
+  estate:   { label: "Estate Sales",   icon: "🏠", color: "#D4A574" },
+  antique:  { label: "Antique Stores", icon: "🏺", color: "#8B6F47" },
+  auction:  { label: "Auctions",       icon: "🔨", color: "#C17F59" },
+  flea:     { label: "Flea Markets",   icon: "🎪", color: "#A67B5B" },
+  thrift:   { label: "Thrift Stores",  icon: "♻️", color: "#9B7653" },
+  boutique: { label: "Boutiques",      icon: "👗", color: "#B07095" },
+};
+
+// Blacklist: these get a flagged badge instead of silently disappearing
+const BLACKLIST_PATTERNS = [
+  // Hair / personal care
+  /barber/i, /hair salon/i, /hair studio/i, /barbershop/i,
+  // Furniture / big box
+  /furniture mart/i, /nebraska furniture/i,
+  // Entertainment / gaming
+  /pop culture exchange/i, /video game/i, /game store/i, /\bgame on\b/i,
+  // Department / clothing stores
+  /\bhouse of j\b/i, /gordmans/i, /richman/i, /clothing store/i,
+  // Stationery / paper goods
+  /stationery/i, /paper goods/i, /\bfive nine\b/i,
+  // Auto / electronics
+  /auto.?repair/i, /autoerepair/i, /electronics store/i,
+  // Hospitality
+  /bed.?and.?breakfast/i, /\bb&b\b/i, /atelier new wave/i,
+  // Vintage aesthetic only (new goods, not actual vintage)
+  /prairie in bloom/i, /home goods store/i,
+];
+
+// Boutique remapping: name matches → boutique category
+const BOUTIQUE_PATTERNS = [
+  /boutique/i, /stitch/i, /stitches/i, /clothi/i, /apparel/i, /fashion/i,
+  /patina/i, /pre.?owned.*cloth/i, /designer.*cloth/i,
+];
+
+function classifyListing(name, originalCategory) {
+  if (BLACKLIST_PATTERNS.some(p => p.test(name))) return { category: originalCategory, flagged: true };
+  if (BOUTIQUE_PATTERNS.some(p => p.test(name)))  return { category: "boutique",       flagged: false };
+  return { category: originalCategory, flagged: false };
+}
+
+const GROUPS = [
+  { id: 1, name: "NE Pickers Crew",  members: ["You", "Jack", "Thea"],      color: "#D4A574", icon: "⚡" },
+  { id: 2, name: "Weekend Warriors", members: ["You", "PJ", "Linda K."],    color: "#8B6F47", icon: "🗺️" },
+];
+
+// ── Transform scraper JSON → UI fields ───────────────
+function transformListing(raw, index) {
+  const distNum  = raw.distance ? parseFloat(raw.distance) : 99;
+  const addrParts = [raw.address, raw.city, raw.state].filter(p => p && p.trim());
+  const name     = raw.name || "Unknown Sale";
+  const { category, flagged } = classifyListing(name, raw.category || "estate");
+  return {
+    id:          raw.id || String(index),
+    name,
+    category,
+    flagged,
+    lat:         raw.lat || null,
+    lng:         raw.lng || null,
+    address:     addrParts.join(", ") || `${raw.city||""}, ${raw.state||""}`,
+    date:        raw.dates || "—",
+    time:        raw.times || "—",
+    distance:    isNaN(distNum) ? 99 : distNum,
+    rating:      raw.rating || 0,
+    tags:        raw.tags || [],
+    description: raw.description || (raw.company ? `Listed by ${raw.company}` : "Visit the listing page for full details."),
+    featured:    raw.status === "Going on Now!" || raw.status === "Ends Today!",
+    photos:      raw.photo_count || 0,
+    status:      raw.status || "",
+    url:         raw.url || "",
+    company:     raw.company || "",
+    source:      raw.source || "estatesales.net",
+  };
+}
+
+// ── Small UI pieces ───────────────────────────────────
+const StarRating = ({ rating }) => {
+  if (!rating) return <span style={{ color: "var(--muted)", fontSize: 11 }}>New listing</span>;
+  return (
+    <span style={{ fontSize: 12, color: "var(--accent)" }}>
+      {"★".repeat(Math.floor(rating))}
+      {rating % 1 >= 0.5 ? "½" : ""}
+      <span style={{ color: "var(--muted)", marginLeft: 4 }}>{rating}</span>
+    </span>
+  );
+};
+
+const Tag = ({ label }) => (
+  <span style={{
+    display: "inline-block", padding: "2px 8px", fontSize: 10,
+    fontFamily: "var(--ff-mono)", textTransform: "uppercase", letterSpacing: "0.08em",
+    background: "var(--tag-bg)", color: "var(--tag-text)", borderRadius: 3, marginRight: 4, marginBottom: 4,
+  }}>{label}</span>
+);
+
+const CategoryBadge = ({ category, compact }) => {
+  const c = CATEGORIES[category] || CATEGORIES.estate;
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 4,
+      padding: compact ? "2px 6px" : "3px 10px",
+      fontSize: compact ? 10 : 11, fontFamily: "var(--ff-mono)",
+      background: c.color + "22", color: c.color, borderRadius: 3,
+      border: `1px solid ${c.color}44`, textTransform: "uppercase", letterSpacing: "0.06em",
+    }}>
+      <span>{c.icon}</span>{compact ? "" : c.label}
+    </span>
+  );
+};
+
+// ── Map View (Leaflet) ────────────────────────────────
+// allListings  = full dataset (used to build/maintain markers, never changes after load)
+// visibleIds   = Set of IDs currently passing the list filters (controls marker opacity)
+const MapView = ({ allListings, visibleIds, selectedId, onSelect, routeMode, routeStops, onBoundsChange }) => {
+  const mapRef       = useRef(null);
+  const leafletRef   = useRef(null);
+  const markersRef   = useRef({});      // id → { marker, listing }
+  const routeLineRef = useRef(null);
+  const boundsTimerRef = useRef(null);
+  const initialFitDone = useRef(false);
+
+  // ── Init map once ──────────────────────────────────
+  useEffect(() => {
+    if (leafletRef.current) return;
+    const map = L.map(mapRef.current, { zoomControl: false });
+    L.control.zoom({ position: "topright" }).addTo(map);
+
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+      maxZoom: 19,
+    }).addTo(map);
+
+    map.setView([41.54, -96.13], 8);
+    leafletRef.current = map;
+
+    // Debounced bounds reporting — only fires 300ms after the user stops moving
+    const reportBounds = () => {
+      clearTimeout(boundsTimerRef.current);
+      boundsTimerRef.current = setTimeout(() => {
+        const b = map.getBounds();
+        onBoundsChange && onBoundsChange({
+          north: b.getNorth(), south: b.getSouth(),
+          east:  b.getEast(),  west:  b.getWest(),
+        });
+      }, 300);
+    };
+    map.on("moveend zoomend", reportBounds);
+    map.whenReady(reportBounds);
+
+    return () => {
+      clearTimeout(boundsTimerRef.current);
+      map.remove();
+      leafletRef.current = null;
+    };
+  }, []);
+
+  // ── Build markers once when allListings first arrives ──
+  useEffect(() => {
+    const map = leafletRef.current;
+    if (!map || !allListings.length) return;
+
+    // Only add markers that don't already exist
+    const validListings = allListings.filter(l => l.lat && l.lng);
+
+    validListings.forEach(l => {
+      if (markersRef.current[l.id]) return; // already on map
+
+      const cat = CATEGORIES[l.category] || CATEGORIES.estate;
+      const size = 28;
+      const icon = L.divIcon({
+        className: "",
+        html: `<div style="
+          width:${size}px;height:${size}px;border-radius:50%;
+          background:${cat.color};border:2px solid #1A1611;
+          display:flex;align-items:center;justify-content:center;
+          font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,0.5);
+          position:relative;
+          ${l.featured ? `box-shadow:0 0 0 3px ${cat.color}44,0 2px 8px rgba(0,0,0,0.5);` : ""}
+        ">${cat.icon}</div>`,
+        iconSize: [size, size],
+        iconAnchor: [size/2, size/2],
+      });
+
+      const marker = L.marker([l.lat, l.lng], { icon })
+        .addTo(map)
+        .on("click", () => onSelect(l.id));
+
+      marker.bindTooltip(
+        `<div style="font-family:sans-serif;font-size:12px;font-weight:600;color:#1A1611">${l.name}</div>`,
+        { permanent: false, direction: "top", offset: [0, -size/2], className: "fadeandfind-tooltip" }
+      );
+
+      markersRef.current[l.id] = { marker, listing: l };
+    });
+
+    // Fit bounds only on initial load
+    if (!initialFitDone.current && validListings.length > 0) {
+      initialFitDone.current = true;
+      if (validListings.length > 1) {
+        map.fitBounds(L.latLngBounds(validListings.map(l => [l.lat, l.lng])), { padding: [40, 40] });
+      } else {
+        map.setView([validListings[0].lat, validListings[0].lng], 11);
+      }
+    }
+  }, [allListings]);
+
+  // ── Update marker appearance when selection/route/visibility changes ──
+  useEffect(() => {
+    Object.entries(markersRef.current).forEach(([id, { marker, listing }]) => {
+      const cat      = CATEGORIES[listing.category] || CATEGORIES.estate;
+      const isSel    = selectedId === id;
+      const isRoute  = routeStops.includes(id);
+      const rIdx     = routeStops.indexOf(id);
+      const isVis    = !visibleIds || visibleIds.has(id);
+      const size     = isSel ? 36 : 28;
+
+      // Hide filtered-out markers by setting opacity to 0 (keeps them on map, no DOM churn)
+      marker.setOpacity(isVis ? 1 : 0);
+      marker.getElement() && (marker.getElement().style.pointerEvents = isVis ? "" : "none");
+
+      const icon = L.divIcon({
+        className: "",
+        html: `<div style="
+          width:${size}px;height:${size}px;border-radius:50%;
+          background:${cat.color};border:${isSel ? "3px solid #E8DDD0" : "2px solid #1A1611"};
+          display:flex;align-items:center;justify-content:center;
+          font-size:${isSel ? 16 : 13}px;
+          box-shadow:0 2px 8px rgba(0,0,0,0.5);
+          position:relative;
+          ${listing.featured ? `box-shadow:0 0 0 3px ${cat.color}44,0 2px 8px rgba(0,0,0,0.5);` : ""}
+        ">${cat.icon}${isRoute ? `<span style="position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:#D4A574;color:#1A1611;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;">${rIdx+1}</span>` : ""}</div>`,
+        iconSize: [size, size],
+        iconAnchor: [size/2, size/2],
+      });
+      marker.setIcon(icon);
+    });
+  }, [selectedId, routeStops, visibleIds]);
+
+  // Pan to selected marker
+  useEffect(() => {
+    const map = leafletRef.current;
+    if (!map || !selectedId) return;
+    const entry = markersRef.current[selectedId];
+    if (entry?.listing?.lat) {
+      map.panTo([entry.listing.lat, entry.listing.lng], { animate: true, duration: 0.5 });
+    }
+  }, [selectedId]);
+
+  // Draw route lines
+  useEffect(() => {
+    const map = leafletRef.current;
+    if (!map) return;
+    if (routeLineRef.current) { map.removeLayer(routeLineRef.current); routeLineRef.current = null; }
+    if (!routeMode || routeStops.length < 2) return;
+    const points = routeStops
+      .map(id => markersRef.current[id]?.listing)
+      .filter(l => l?.lat)
+      .map(l => [l.lat, l.lng]);
+    if (points.length > 1) {
+      routeLineRef.current = L.polyline(points, {
+        color: "#D4A574", weight: 3, dashArray: "8 6", opacity: 0.8,
+      }).addTo(map);
+    }
+  }, [routeMode, routeStops]);
+
+  return (
+    <div style={{ width:"100%", height:480, borderRadius:12, overflow:"hidden", position:"relative", border:"1px solid var(--border)" }}>
+      <div ref={mapRef} style={{ width:"100%", height:"100%" }} />
+      <style>{`
+        .fadeandfind-tooltip { background:#E8DDD0; border:none; border-radius:6px; padding:4px 8px; box-shadow:0 2px 8px rgba(0,0,0,0.4); }
+        .fadeandfind-tooltip::before { display:none; }
+        .leaflet-control-zoom { border:none !important; }
+        .leaflet-control-zoom a { background:#231E18 !important; color:#E8DDD0 !important; border-color:#3A3228 !important; }
+        .leaflet-control-attribution { background:rgba(26,22,17,0.8) !important; color:#8A7E6F !important; font-size:9px !important; }
+        .leaflet-control-attribution a { color:#D4A574 !important; }
+      `}</style>
+    </div>
+  );
+};
+
+// ── Listing Card ──────────────────────────────────────
+const ListingCard = ({ listing, isSelected, isFavorite, isRouteStop, routeIndex, onSelect, onFavorite, onAddRoute, onUnflag, isClosed, isVerify, onMarkClosed, onMarkVerify, onClearStatus, isBeenThere, onToggleBeenThere, onHide }) => {
+  const cat = CATEGORIES[listing.category] || CATEGORIES.estate;
+
+  // Flagged listings render as a compact dismissible warning row
+  if (listing.flagged) {
+    return (
+      <div style={{
+        display:"flex", alignItems:"center", gap:10, padding:"8px 12px",
+        borderRadius:8, marginBottom:6, opacity:0.7,
+        background:"#2A1E1A", border:"1px dashed #6A3A2A",
+      }}>
+        <span style={{fontSize:13}}>🚩</span>
+        <div style={{flex:1, minWidth:0}}>
+          <span style={{fontSize:12, color:"#C8856A", fontFamily:"var(--ff-mono)", fontWeight:600}}>{listing.name}</span>
+          <span style={{fontSize:10, color:"var(--muted)", fontFamily:"var(--ff-mono)", marginLeft:8}}>auto-filtered · {listing.address}</span>
+        </div>
+        <button
+          onClick={e=>{e.stopPropagation(); onUnflag(listing.id);}}
+          title="Keep this listing"
+          style={{fontSize:11, color:"var(--muted)", background:"none", border:"1px solid var(--border)", borderRadius:4, padding:"2px 7px", cursor:"pointer", fontFamily:"var(--ff-mono)", whiteSpace:"nowrap"}}
+        >Keep</button>
+      </div>
+    );
+  }
+
+  const statusBanner = isClosed
+    ? { bg:"#2A1414", border:"#6A2A2A", color:"#C86A6A", icon:"🚫", label:"Reported Closed · verify before visiting" }
+    : isVerify
+    ? { bg:"#2A2414", border:"#6A5A2A", color:"#C8A86A", icon:"⚠️", label:"Verify First · call ahead or check website" }
+    : null;
+
+  return (
+    <div onClick={()=>onSelect(listing.id)} style={{
+      padding:"14px 16px", borderRadius:10, cursor:"pointer", marginBottom:8, position:"relative",
+      background: isSelected ? "var(--card-active)" : "var(--card-bg)",
+      border: isSelected ? `2px solid ${cat.color}` : statusBanner ? `1px solid ${statusBanner.border}` : "1px solid var(--border)",
+      opacity: isClosed ? 0.7 : 1,
+      transition:"all 0.2s",
+    }}>
+      {listing.featured && !statusBanner && (
+        <div style={{position:"absolute",top:-1,right:12,background:"var(--accent)",color:"var(--bg)",fontSize:9,fontFamily:"var(--ff-mono)",padding:"2px 8px",borderRadius:"0 0 4px 4px",textTransform:"uppercase",letterSpacing:"0.1em"}}>
+          {listing.status || "Featured"}
+        </div>
+      )}
+      {statusBanner && (
+        <div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",borderRadius:6,background:statusBanner.bg,marginBottom:8,fontSize:11,color:statusBanner.color,fontFamily:"var(--ff-mono)"}}>
+          <span>{statusBanner.icon}</span>
+          <span style={{flex:1}}>{statusBanner.label}</span>
+          <button onClick={e=>{e.stopPropagation();onClearStatus(listing.id);}} style={{fontSize:10,color:"var(--muted)",background:"none",border:"none",cursor:"pointer",textDecoration:"underline",padding:0}}>Undo</button>
+        </div>
+      )}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+            <div style={{fontSize:14,fontWeight:700,color: isClosed ? "var(--muted)" : "var(--text)",fontFamily:"var(--ff-heading)",textDecoration: isClosed ? "line-through" : "none"}}>{listing.name}</div>
+            {isBeenThere && <span style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"#8ABA8A",background:"#1A2A1A",padding:"1px 6px",borderRadius:3,flexShrink:0}}>👣 been</span>}
+          </div>
+          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+            <CategoryBadge category={listing.category} compact/>
+            <span style={{fontSize:11,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>{listing.distance} mi</span>
+            <StarRating rating={listing.rating}/>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:4,marginLeft:8,flexShrink:0}}>
+          <button onClick={e=>{e.stopPropagation();onFavorite(listing.id);}} style={{width:28,height:28,borderRadius:6,border:"1px solid var(--border)",cursor:"pointer",background:isFavorite?"#D4A57422":"transparent",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {isFavorite?"❤️":"🤍"}
+          </button>
+          <button onClick={e=>{e.stopPropagation();onAddRoute(listing.id);}} style={{width:28,height:28,borderRadius:6,border:"1px solid var(--border)",cursor:"pointer",background:isRouteStop?`${cat.color}22`:"transparent",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+            📍
+            {isRouteStop && <span style={{position:"absolute",top:-4,right:-4,width:14,height:14,borderRadius:"50%",background:"var(--accent)",color:"var(--bg)",fontSize:8,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>{routeIndex+1}</span>}
+          </button>
+        </div>
+      </div>
+      <div style={{fontSize:11,color:"var(--muted)",marginBottom:6,fontFamily:"var(--ff-mono)"}}>
+        {listing.address} · {listing.date} · {listing.time}
+      </div>
+      {listing.photos > 0 && (
+        <div style={{fontSize:10,color:"var(--muted)",fontFamily:"var(--ff-mono)",marginBottom:4}}>📷 {listing.photos} photos</div>
+      )}
+      {isSelected && (
+        <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid var(--border)"}}>
+          <p style={{fontSize:12.5,color:"var(--text)",lineHeight:1.5,margin:"0 0 8px 0",fontFamily:"var(--ff-body)"}}>{listing.description}</p>
+          {listing.tags.length > 0 && (
+            <div style={{display:"flex",flexWrap:"wrap",gap:2,marginBottom:8}}>
+              {listing.tags.map(t=><Tag key={t} label={t}/>)}
+            </div>
+          )}
+          <div style={{display:"flex",gap:8,marginBottom:8}}>
+            {listing.lat && listing.lng ? (
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&destination=${listing.lat},${listing.lng}&travelmode=driving`}
+                target="_blank" rel="noopener noreferrer"
+                style={{flex:1,padding:"8px 12px",borderRadius:6,border:"none",background:cat.color,color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"var(--ff-heading)",textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center"}}
+              >🗺️ Get Directions</a>
+            ) : (
+              <button disabled style={{flex:1,padding:"8px 12px",borderRadius:6,border:"none",background:"var(--border)",color:"var(--muted)",fontSize:12,fontWeight:600,cursor:"default",fontFamily:"var(--ff-heading)"}}>No Location</button>
+            )}
+            {listing.url ? (
+              <a href={listing.url} target="_blank" rel="noopener noreferrer" style={{flex:1,padding:"8px 12px",borderRadius:6,border:`1px solid ${cat.color}`,background:"transparent",color:cat.color,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"var(--ff-heading)",textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center"}}>View Listing ↗</a>
+            ) : (
+              <button
+                onClick={e=>{
+                  e.stopPropagation();
+                  const text = `${listing.name}\n${listing.address}\n${listing.date} · ${listing.time}`;
+                  if (navigator.share) {
+                    navigator.share({ title: listing.name, text });
+                  } else {
+                    navigator.clipboard?.writeText(text).then(()=>alert("Copied to clipboard!"));
+                  }
+                }}
+                style={{flex:1,padding:"8px 12px",borderRadius:6,border:`1px solid ${cat.color}`,background:"transparent",color:cat.color,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"var(--ff-heading)"}}>
+                Share 📤
+              </button>
+            )}
+          </div>
+          {/* ── Been There / Report row ── */}
+          <div style={{paddingTop:8,borderTop:"1px solid var(--border)"}}>
+            {/* Been There + Hide */}
+            <div style={{display:"flex",gap:6,marginBottom:6}}>
+              <button
+                onClick={e=>{e.stopPropagation(); onToggleBeenThere(listing.id);}}
+                style={{flex:1,padding:"7px 8px",borderRadius:6,fontSize:11,fontFamily:"var(--ff-mono)",cursor:"pointer",
+                  border: isBeenThere ? "1px solid #4A6A4A" : "1px solid var(--border)",
+                  background: isBeenThere ? "#1A2A1A" : "transparent",
+                  color: isBeenThere ? "#8ABA8A" : "var(--muted)",
+                  fontWeight: isBeenThere ? 700 : 400,
+                }}
+              >{isBeenThere ? "👣 Been There" : "👣 Been There?"}</button>
+              {isBeenThere && (
+                <button
+                  onClick={e=>{e.stopPropagation(); onHide(listing.id);}}
+                  style={{flex:1,padding:"7px 8px",borderRadius:6,fontSize:11,fontFamily:"var(--ff-mono)",cursor:"pointer",
+                    border:"1px solid #3A3228",background:"#231E18",color:"var(--muted)",
+                  }}
+                >Hide from List 👻</button>
+              )}
+            </div>
+            {/* Closed / Verify */}
+            <div style={{display:"flex",gap:6}}>
+              <span style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"var(--muted)",alignSelf:"center",marginRight:2}}>Report:</span>
+              <button
+                onClick={e=>{e.stopPropagation(); isClosed ? onClearStatus(listing.id) : onMarkClosed(listing.id);}}
+                style={{flex:1,padding:"6px 8px",borderRadius:6,fontSize:11,fontFamily:"var(--ff-mono)",cursor:"pointer",
+                  border: isClosed ? "1px solid #6A2A2A" : "1px solid var(--border)",
+                  background: isClosed ? "#2A1414" : "transparent",
+                  color: isClosed ? "#C86A6A" : "var(--muted)",
+                  fontWeight: isClosed ? 700 : 400,
+                }}
+              >{isClosed ? "🚫 Closed" : "🚫 Mark Closed"}</button>
+              <button
+                onClick={e=>{e.stopPropagation(); isVerify ? onClearStatus(listing.id) : onMarkVerify(listing.id);}}
+                style={{flex:1,padding:"6px 8px",borderRadius:6,fontSize:11,fontFamily:"var(--ff-mono)",cursor:"pointer",
+                  border: isVerify ? "1px solid #6A5A2A" : "1px solid var(--border)",
+                  background: isVerify ? "#2A2414" : "transparent",
+                  color: isVerify ? "#C8A86A" : "var(--muted)",
+                  fontWeight: isVerify ? 700 : 400,
+                }}
+              >{isVerify ? "⚠️ Verify First" : "⚠️ Verify First"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Filter Panel ──────────────────────────────────────
+const FilterPanel = ({ filters, setFilters, onClose }) => (
+  <div style={{position:"absolute",top:0,left:0,right:0,bottom:0,zIndex:100,background:"var(--bg)",padding:20,overflow:"auto",animation:"slideUp 0.3s ease"}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+      <h3 style={{fontFamily:"var(--ff-heading)",fontSize:20,color:"var(--text)",margin:0}}>Filters</h3>
+      <button onClick={onClose} style={{width:32,height:32,borderRadius:8,border:"1px solid var(--border)",background:"var(--card-bg)",fontSize:16,cursor:"pointer",color:"var(--text)"}}>✕</button>
+    </div>
+    <div style={{marginBottom:20}}>
+      <label style={{fontSize:11,fontFamily:"var(--ff-mono)",color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.1em",display:"block",marginBottom:8}}>Categories</label>
+      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+        {Object.entries(CATEGORIES).map(([key,val])=>{
+          const active = filters.categories.includes(key);
+          return <button key={key} onClick={()=>setFilters(f=>({...f,categories:active?f.categories.filter(c=>c!==key):[...f.categories,key]}))} style={{padding:"6px 12px",borderRadius:6,fontSize:12,cursor:"pointer",border:active?`2px solid ${val.color}`:"1px solid var(--border)",background:active?val.color+"22":"var(--card-bg)",color:active?val.color:"var(--muted)",fontWeight:active?700:400}}>{val.icon} {val.label}</button>;
+        })}
+      </div>
+    </div>
+    <div style={{marginBottom:20}}>
+      <label style={{fontSize:11,fontFamily:"var(--ff-mono)",color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.1em",display:"block",marginBottom:8}}>Max Distance: {filters.maxDistance} miles</label>
+      <input type="range" min={5} max={200} value={filters.maxDistance} onChange={e=>setFilters(f=>({...f,maxDistance:+e.target.value}))} style={{width:"100%",accentColor:"var(--accent)"}}/>
+    </div>
+    <div style={{marginBottom:20}}>
+      <label style={{fontSize:11,fontFamily:"var(--ff-mono)",color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.1em",display:"block",marginBottom:8}}>Sort By</label>
+      <div style={{display:"flex",gap:6}}>
+        {["distance","rating","date"].map(s=>(
+          <button key={s} onClick={()=>setFilters(f=>({...f,sortBy:s}))} style={{flex:1,padding:"8px 0",borderRadius:6,fontSize:12,cursor:"pointer",border:filters.sortBy===s?"2px solid var(--accent)":"1px solid var(--border)",background:filters.sortBy===s?"var(--accent-bg)":"var(--card-bg)",color:filters.sortBy===s?"var(--accent)":"var(--muted)",fontFamily:"var(--ff-mono)",textTransform:"capitalize",fontWeight:filters.sortBy===s?700:400}}>{s}</button>
+        ))}
+      </div>
+    </div>
+    <div style={{marginBottom:20}}>
+      <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+        <input type="checkbox" checked={filters.featuredOnly} onChange={e=>setFilters(f=>({...f,featuredOnly:e.target.checked}))} style={{accentColor:"var(--accent)"}}/>
+        <span style={{fontSize:13,color:"var(--text)"}}>Active sales only (Ends Today / Going on Now)</span>
+      </label>
+    </div>
+    <div>
+      <label style={{fontSize:11,fontFamily:"var(--ff-mono)",color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.1em",display:"block",marginBottom:8}}>Search Tags</label>
+      <input type="text" value={filters.tagSearch} onChange={e=>setFilters(f=>({...f,tagSearch:e.target.value}))} placeholder="e.g. furniture, jewelry, tools..." style={{width:"100%",padding:"10px 12px",borderRadius:6,border:"1px solid var(--border)",background:"var(--card-bg)",color:"var(--text)",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+    </div>
+  </div>
+);
+
+// ── Route optimization (nearest-neighbor) ────────────
+function optimizeRoute(listings) {
+  if (listings.length <= 2) return listings;
+  const remaining = [...listings];
+  const route = [remaining.shift()]; // start with first selected
+  while (remaining.length) {
+    const last = route[route.length - 1];
+    let nearestIdx = 0;
+    let nearestDist = Infinity;
+    remaining.forEach((l, i) => {
+      if (!l.lat || !l.lng || !last.lat || !last.lng) return;
+      const d = Math.hypot(l.lat - last.lat, l.lng - last.lng);
+      if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
+    });
+    route.push(remaining.splice(nearestIdx, 1)[0]);
+  }
+  return route;
+}
+
+function buildGoogleMapsUrl(listings) {
+  const valid = listings.filter(l => l.lat && l.lng);
+  if (!valid.length) return null;
+  if (valid.length === 1) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${valid[0].lat},${valid[0].lng}`;
+  }
+  const origin      = `${valid[0].lat},${valid[0].lng}`;
+  const destination = `${valid[valid.length-1].lat},${valid[valid.length-1].lng}`;
+  const waypoints   = valid.slice(1, -1).map(l => `${l.lat},${l.lng}`).join("|");
+  let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+  if (waypoints) url += `&waypoints=${encodeURIComponent(waypoints)}`;
+  return url;
+}
+
+// ── Route Panel ───────────────────────────────────────
+const RoutePanel = ({ stops, listings, onRemove, onClear, onReorder }) => {
+  const [optimized, setOptimized] = React.useState(false);
+  const stopListings = stops.map(id => listings.find(l => l.id === id)).filter(Boolean);
+
+  const handleOptimize = () => {
+    const sorted = optimizeRoute([...stopListings]);
+    onReorder(sorted.map(l => l.id));
+    setOptimized(true);
+  };
+
+  const handleNavigate = () => {
+    const url = buildGoogleMapsUrl(stopListings);
+    if (url) window.open(url, "_blank");
+  };
+
+  const handleOptimizeAndNavigate = () => {
+    const sorted = optimizeRoute([...stopListings]);
+    onReorder(sorted.map(l => l.id));
+    setOptimized(true);
+    const url = buildGoogleMapsUrl(sorted);
+    if (url) window.open(url, "_blank");
+  };
+
+  // Rough total: sum of sequential distances between stops
+  let totalMiles = 0;
+  for (let i = 0; i < stopListings.length - 1; i++) {
+    const a = stopListings[i], b = stopListings[i+1];
+    if (a.lat && b.lat) {
+      // ~69 miles per degree latitude, ~53 miles per degree longitude at ~41°N
+      totalMiles += Math.hypot((b.lat - a.lat) * 69, (b.lng - a.lng) * 53);
+    }
+  }
+
+  return (
+    <div style={{padding:16,background:"var(--card-bg)",borderRadius:10,border:"1px solid var(--border)",marginBottom:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <h4 style={{margin:0,fontFamily:"var(--ff-heading)",fontSize:15,color:"var(--text)"}}>
+          Route Plan
+          <span style={{fontFamily:"var(--ff-mono)",fontSize:11,color:"var(--muted)",fontWeight:400,marginLeft:6}}>
+            ({stops.length} stop{stops.length!==1?"s":""}{totalMiles>0 ? ` · ~${totalMiles.toFixed(0)} mi` : ""})
+          </span>
+          {optimized && <span style={{fontFamily:"var(--ff-mono)",fontSize:10,color:"#6A9A6A",marginLeft:8}}>✓ optimized</span>}
+        </h4>
+        <button onClick={onClear} style={{fontSize:11,color:"var(--muted)",background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>Clear</button>
+      </div>
+
+      {stopListings.map((l,i) => (
+        <div key={l.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:i<stopListings.length-1?"1px solid var(--border)":"none"}}>
+          <span style={{width:22,height:22,borderRadius:"50%",background:"var(--accent)",color:"var(--bg)",fontSize:11,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{i+1}</span>
+          <span style={{flex:1,fontSize:12,color:"var(--text)"}}>{l.name}</span>
+          <span style={{fontSize:10,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>{(CATEGORIES[l.category]||CATEGORIES.estate).icon}</span>
+          <button onClick={()=>{ onRemove(l.id); setOptimized(false); }} style={{width:20,height:20,borderRadius:4,border:"1px solid var(--border)",background:"transparent",fontSize:10,cursor:"pointer",color:"var(--muted)",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+        </div>
+      ))}
+
+      <div style={{display:"flex",gap:8,marginTop:10}}>
+        {!optimized && stopListings.length >= 3 && (
+          <button onClick={handleOptimize} style={{flex:1,padding:"10px",borderRadius:6,border:"1px solid var(--accent)",background:"transparent",color:"var(--accent)",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"var(--ff-heading)"}}>
+            ⚡ Optimize Order
+          </button>
+        )}
+        <button
+          onClick={handleOptimizeAndNavigate}
+          disabled={stopListings.length < 1}
+          style={{flex:2,padding:"10px",borderRadius:6,border:"none",background:stopListings.length<1?"var(--border)":"var(--accent)",color:stopListings.length<1?"var(--muted)":"var(--bg)",fontSize:13,fontWeight:700,cursor:stopListings.length<1?"default":"pointer",fontFamily:"var(--ff-heading)"}}
+        >
+          🧭 {optimized ? "Open in Maps" : "Optimize & Navigate"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── Group Panel ───────────────────────────────────────
+const GroupPanel = ({ groups, routeStops, listings }) => {
+  const [shared, setShared] = React.useState(null);
+
+  const handleShareRoute = (group) => {
+    if (!routeStops.length) {
+      alert("No route planned yet — pin some stops on the map first!");
+      return;
+    }
+    const stopListings = routeStops.map(id => listings.find(l => l.id === id)).filter(Boolean);
+    const mapsUrl = buildGoogleMapsUrl(stopListings);
+    const lines = [
+      `📍 Fade & Find Route — ${new Date().toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}`,
+      `Shared by: You → ${group.name}`,
+      "",
+      ...stopListings.map((l,i) => `${i+1}. ${l.name}  (${l.address})`),
+      "",
+      mapsUrl ? `🗺️ Open in Maps:\n${mapsUrl}` : "",
+    ].filter(l => l !== undefined);
+    const text = lines.join("\n");
+
+    if (navigator.share) {
+      navigator.share({ title: `Fade & Find Route · ${group.name}`, text })
+        .then(() => setShared(group.id))
+        .catch(() => {});
+    } else {
+      navigator.clipboard?.writeText(text).then(() => {
+        setShared(group.id);
+        setTimeout(() => setShared(null), 2500);
+      });
+    }
+  };
+
+  return (
+    <div>
+      {!routeStops.length && (
+        <div style={{padding:"10px 14px",borderRadius:8,background:"#2A241D",border:"1px dashed var(--border)",marginBottom:12,fontSize:12,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>
+          📍 Pin stops on the map to build a route, then share it here.
+        </div>
+      )}
+      <div style={{padding:16,background:"var(--card-bg)",borderRadius:10,border:"1px solid var(--border)",marginBottom:12}}>
+        <h4 style={{margin:"0 0 12px 0",fontFamily:"var(--ff-heading)",fontSize:15,color:"var(--text)"}}>Your Groups</h4>
+        {groups.map(g=>(
+          <div key={g.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid var(--border)"}}>
+            <span style={{width:32,height:32,borderRadius:8,background:g.color+"22",border:`1px solid ${g.color}44`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>{g.icon}</span>
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,fontWeight:600,color:"var(--text)",fontFamily:"var(--ff-heading)"}}>{g.name}</div>
+              <div style={{fontSize:11,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>{g.members.join(", ")}</div>
+            </div>
+            <button
+              onClick={()=>handleShareRoute(g)}
+              style={{padding:"4px 10px",borderRadius:6,border:`1px solid ${shared===g.id?"#6A9A6A":g.color}`,background:shared===g.id?"#1A2A1A":"transparent",color:shared===g.id?"#6A9A6A":g.color,fontSize:11,cursor:"pointer",transition:"all 0.2s",fontFamily:"var(--ff-mono)"}}
+            >
+              {shared===g.id ? "✓ Sent!" : "Share Route"}
+            </button>
+          </div>
+        ))}
+        <button style={{width:"100%",marginTop:12,padding:"8px",borderRadius:6,border:"1px dashed var(--border)",background:"transparent",color:"var(--muted)",fontSize:12,cursor:"pointer"}}>+ Create New Group</button>
+      </div>
+
+      {routeStops.length > 0 && (
+        <div style={{padding:14,background:"var(--card-bg)",borderRadius:10,border:"1px solid var(--border)"}}>
+          <p style={{fontSize:11,fontFamily:"var(--ff-mono)",color:"var(--muted)",margin:"0 0 8px 0",textTransform:"uppercase",letterSpacing:"0.08em"}}>Current Route · {routeStops.length} stop{routeStops.length!==1?"s":""}</p>
+          {routeStops.map((id,i) => {
+            const l = listings.find(x=>x.id===id);
+            if (!l) return null;
+            return (
+              <div key={id} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0"}}>
+                <span style={{width:18,height:18,borderRadius:"50%",background:"var(--accent)",color:"var(--bg)",fontSize:10,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{i+1}</span>
+                <span style={{fontSize:12,color:"var(--text)"}}>{l.name}</span>
+                <span style={{fontSize:10,color:"var(--muted)",fontFamily:"var(--ff-mono)",marginLeft:"auto"}}>{(CATEGORIES[l.category]||CATEGORIES.estate).icon}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Alert Panel ───────────────────────────────────────
+const AlertPanel = ({ alerts, setAlerts }) => (
+  <div style={{padding:16,background:"var(--card-bg)",borderRadius:10,border:"1px solid var(--border)",marginBottom:12}}>
+    <h4 style={{margin:"0 0 12px 0",fontFamily:"var(--ff-heading)",fontSize:15,color:"var(--text)"}}>Alerts & Notifications</h4>
+    {[
+      {key:"newEstates",    label:"New estate sales within 30mi",       icon:"🏠"},
+      {key:"auctionReminders", label:"Auction day reminders",           icon:"🔨"},
+      {key:"tagMatches",   label:"Tag matches (jewelry, furniture)",    icon:"🏷️"},
+    ].map(a=>(
+      <label key={a.key} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid var(--border)",cursor:"pointer"}}>
+        <span style={{fontSize:16}}>{a.icon}</span>
+        <span style={{flex:1,fontSize:12,color:"var(--text)"}}>{a.label}</span>
+        <div onClick={()=>setAlerts(prev=>({...prev,[a.key]:!prev[a.key]}))} style={{width:38,height:20,borderRadius:10,cursor:"pointer",position:"relative",background:alerts[a.key]?"var(--accent)":"var(--border)",transition:"background 0.2s"}}>
+          <div style={{width:16,height:16,borderRadius:"50%",background:"#fff",position:"absolute",top:2,left:alerts[a.key]?20:2,transition:"left 0.2s"}}/>
+        </div>
+      </label>
+    ))}
+  </div>
+);
+
+// ── Load Screen ───────────────────────────────────────
+const LoadScreen = ({ onLoad }) => {
+  const handleFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        const raw = (data.listings || []).filter(l => l.lat && l.lng);
+        onLoad(raw.map(transformListing), file.name);
+      } catch {
+        alert("Couldn't read that file. Make sure it's fadeandfind_listings.json from the scraper.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  return (
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24,padding:32,background:"var(--bg)"}}>
+      <h1 style={{fontFamily:"'Playfair Display',Georgia,serif",fontSize:40,fontWeight:900,background:"linear-gradient(135deg,#E8DDD0 0%,#D4A574 100%)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Fade & Find</h1>
+      <p style={{fontFamily:"monospace",fontSize:11,color:"var(--muted)",letterSpacing:"0.15em",textTransform:"uppercase"}}>Where forgotten things find new homes.</p>
+      <div style={{maxWidth:340,width:"100%",padding:24,background:"var(--card-bg)",borderRadius:12,border:"1px solid var(--border)",textAlign:"center"}}>
+        <div style={{fontSize:32,marginBottom:12}}>📂</div>
+        <p style={{fontSize:13,color:"var(--text)",lineHeight:1.6,marginBottom:20}}>
+          Load your <strong style={{color:"var(--accent)"}}>fadeandfind_listings.json</strong> file to see live listings on the map.
+        </p>
+        <label style={{display:"block",padding:"12px 20px",borderRadius:8,background:"var(--accent)",color:"#1A1611",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Playfair Display',Georgia,serif"}}>
+          📍 Load Listings File
+          <input type="file" accept=".json" onChange={handleFile} style={{display:"none"}}/>
+        </label>
+        <p style={{fontSize:11,color:"var(--muted)",marginTop:12,fontFamily:"monospace"}}>
+          Run fadeandfind_scraper_v4.py first to generate this file.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ── MAIN APP ──────────────────────────────────────────
+function Fade & Find() {
+  const [liveListings, setLiveListings]   = useState(null); // null = not loaded yet
+  const [loadedFrom,   setLoadedFrom]     = useState("");
+  const [selectedId,   setSelectedId]     = useState(null);
+  const [favorites,    setFavorites]      = useState([]);
+  const [routeStops,   setRouteStops]     = useState([]);
+  const [routeMode,    setRouteMode]      = useState(false);
+  const [showFilters,  setShowFilters]    = useState(false);
+  const [activeTab,    setActiveTab]      = useState("map");
+  const [filters,      setFilters]        = useState({
+    categories: Object.keys(CATEGORIES),
+    maxDistance: 200,
+    sortBy: "distance",
+    featuredOnly: false,
+    tagSearch: "",
+  });
+  const [alerts, setAlerts] = useState({ newEstates:true, auctionReminders:true, tagMatches:false });
+  const [searchText, setSearchText] = useState("");
+  const [mapBounds, setMapBounds] = useState(null);
+  const [manuallyKept, setManuallyKept] = useState(new Set());
+
+  // Closure reports — persisted in localStorage so they survive page reloads
+  const [closedIds,  setClosedIds]  = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("rr_closed") || "[]")); } catch { return new Set(); }
+  });
+  const [verifyIds, setVerifyIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("rr_verify") || "[]")); } catch { return new Set(); }
+  });
+  const [beenThereIds, setBeenThereIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("rr_been") || "[]")); } catch { return new Set(); }
+  });
+  const [hiddenIds, setHiddenIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("rr_hidden") || "[]")); } catch { return new Set(); }
+  });
+
+  const markClosed = (id) => setClosedIds(prev => {
+    const next = new Set(prev); next.add(id);
+    localStorage.setItem("rr_closed", JSON.stringify([...next]));
+    return next;
+  });
+  const markVerify = (id) => setVerifyIds(prev => {
+    const next = new Set(prev); next.add(id);
+    localStorage.setItem("rr_verify", JSON.stringify([...next]));
+    return next;
+  });
+  const clearStatus = (id) => {
+    setClosedIds(prev => { const next = new Set(prev); next.delete(id); localStorage.setItem("rr_closed", JSON.stringify([...next])); return next; });
+    setVerifyIds(prev => { const next = new Set(prev); next.delete(id); localStorage.setItem("rr_verify", JSON.stringify([...next])); return next; });
+  };
+  const toggleBeenThere = (id) => setBeenThereIds(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    localStorage.setItem("rr_been", JSON.stringify([...next]));
+    return next;
+  });
+  const hideId = (id) => setHiddenIds(prev => {
+    const next = new Set(prev); next.add(id);
+    localStorage.setItem("rr_hidden", JSON.stringify([...next]));
+    return next;
+  });
+  const unhideId = (id) => setHiddenIds(prev => {
+    const next = new Set(prev); next.delete(id);
+    localStorage.setItem("rr_hidden", JSON.stringify([...next]));
+    return next;
+  });
+
+  const cssVars = {
+    "--bg":"#1A1611","--card-bg":"#231E18","--card-active":"#2C261E",
+    "--text":"#E8DDD0","--muted":"#8A7E6F","--accent":"#D4A574",
+    "--accent-bg":"#D4A57418","--border":"#3A3228","--grid":"#2A2418",
+    "--map-bg":"linear-gradient(135deg,#1E1914 0%,#242019 50%,#1A1611 100%)",
+    "--tag-bg":"#2A241D","--tag-text":"#A89880",
+    "--ff-heading":"'Playfair Display',Georgia,serif",
+    "--ff-body":"'Source Sans 3','Source Sans Pro',system-ui,sans-serif",
+    "--ff-mono":"'JetBrains Mono','Fira Code',monospace",
+    fontFamily:"var(--ff-body)",background:"var(--bg)",color:"var(--text)",minHeight:"100vh",position:"relative",
+  };
+
+  // Show load screen until user picks a file
+  if (liveListings === null) {
+    return (
+      <div style={cssVars}>
+        <LoadScreen onLoad={(listings, fname) => { setLiveListings(listings); setLoadedFrom(fname); }} />
+      </div>
+    );
+  }
+
+  const handleUnflag = (id) => setManuallyKept(prev => new Set([...prev, id]));
+
+  // Flagged listings: auto-filtered but shown as dismissible warnings (unless user kept them)
+  const flaggedInView = liveListings.filter(l => {
+    if (!l.flagged || manuallyKept.has(l.id)) return false;
+    if (!mapBounds || !l.lat || !l.lng) return true;
+    return l.lat <= mapBounds.north && l.lat >= mapBounds.south &&
+           l.lng <= mapBounds.east  && l.lng >= mapBounds.west;
+  });
+
+  // Normal listings: not flagged (or manually kept), not hidden, pass all filters
+  const filteredListings = liveListings
+    .filter(l => !l.flagged || manuallyKept.has(l.id))
+    .filter(l => !hiddenIds.has(l.id))
+    .filter(l => filters.categories.includes(l.category))
+    .filter(l => l.distance <= filters.maxDistance)
+    .filter(l => !filters.featuredOnly || l.featured)
+    .filter(l => {
+      if (!filters.tagSearch) return true;
+      const terms = filters.tagSearch.toLowerCase().split(",").map(t=>t.trim());
+      return terms.some(t => l.tags.some(tag=>tag.includes(t)) || l.name.toLowerCase().includes(t));
+    })
+    .filter(l => {
+      if (!searchText) return true;
+      const s = searchText.toLowerCase();
+      return l.name.toLowerCase().includes(s) || l.address.toLowerCase().includes(s);
+    })
+    .filter(l => {
+      if (!mapBounds || !l.lat || !l.lng) return true;
+      return l.lat <= mapBounds.north && l.lat >= mapBounds.south &&
+             l.lng <= mapBounds.east  && l.lng >= mapBounds.west;
+    })
+    .sort((a,b) => {
+      if (filters.sortBy==="distance") return a.distance - b.distance;
+      if (filters.sortBy==="rating")   return (b.rating||0) - (a.rating||0);
+      return 0;
+    });
+
+  const favoriteListings = liveListings.filter(l => favorites.includes(l.id));
+  const toggleFavorite   = (id) => setFavorites(f => f.includes(id) ? f.filter(x=>x!==id) : [...f,id]);
+  const toggleRouteStop  = (id) => { setRouteStops(s => s.includes(id) ? s.filter(x=>x!==id) : [...s,id]); if (!routeMode) setRouteMode(true); };
+
+  return (
+    <div style={cssVars}>
+      {/* ── Header ── */}
+      <header style={{padding:"16px 20px 12px",position:"relative",zIndex:10,borderBottom:"1px solid var(--border)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <div>
+            <h1 style={{fontFamily:"var(--ff-heading)",fontSize:26,fontWeight:900,margin:0,letterSpacing:"-0.02em",background:"linear-gradient(135deg,#E8DDD0 0%,#D4A574 100%)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Fade & Find</h1>
+            <p style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"var(--muted)",letterSpacing:"0.15em",textTransform:"uppercase",marginTop:2}}>Where forgotten things find new homes.</p>
+            <p style={{fontSize:9,fontFamily:"var(--ff-mono)",color:"#6A9A6A",letterSpacing:"0.1em",textTransform:"uppercase",marginTop:2}}>
+              ● Live · {liveListings.length} listings · {loadedFrom}
+            </p>
+          </div>
+          <div style={{display:"flex",gap:6}}>
+            <div style={{width:36,height:36,borderRadius:8,background:"var(--card-bg)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,cursor:"pointer"}}>🔔</div>
+            <div style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#D4A574,#8B6F47)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:"#1A1611",cursor:"pointer"}}>M</div>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <div style={{flex:1,display:"flex",alignItems:"center",gap:8,padding:"0 12px",height:38,borderRadius:8,background:"var(--card-bg)",border:"1px solid var(--border)"}}>
+            <span style={{fontSize:14,opacity:.5}}>🔍</span>
+            <input type="text" value={searchText} onChange={e=>setSearchText(e.target.value)} placeholder="Search sales, stores, tags..." style={{flex:1,border:"none",background:"transparent",outline:"none",color:"var(--text)",fontSize:13}}/>
+          </div>
+          <button onClick={()=>setShowFilters(true)} style={{width:38,height:38,borderRadius:8,border:"1px solid var(--border)",background:"var(--card-bg)",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>⚙️</button>
+          <button onClick={()=>setLiveListings(null)} title="Load new file" style={{width:38,height:38,borderRadius:8,border:"1px solid var(--border)",background:"var(--card-bg)",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>📂</button>
+        </div>
+      </header>
+
+      {/* ── Tabs ── */}
+      <nav style={{display:"flex",borderBottom:"1px solid var(--border)",position:"relative",zIndex:10}}>
+        {[{key:"map",label:"Map",icon:"🗺️"},{key:"favorites",label:"Saved",icon:"❤️",count:favorites.length},{key:"groups",label:"Groups",icon:"👥"},{key:"alerts",label:"Alerts",icon:"🔔"}].map(tab=>(
+          <button key={tab.key} onClick={()=>setActiveTab(tab.key)} style={{flex:1,padding:"10px 0",border:"none",background:"transparent",cursor:"pointer",color:activeTab===tab.key?"var(--accent)":"var(--muted)",borderBottom:activeTab===tab.key?"2px solid var(--accent)":"2px solid transparent",fontFamily:"var(--ff-mono)",fontSize:11,textTransform:"uppercase",letterSpacing:"0.08em",display:"flex",alignItems:"center",justifyContent:"center",gap:4,transition:"all 0.2s"}}>
+            <span>{tab.icon}</span>{tab.label}
+            {tab.count>0 && <span style={{background:"var(--accent)",color:"var(--bg)",width:16,height:16,borderRadius:"50%",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>{tab.count}</span>}
+          </button>
+        ))}
+      </nav>
+
+      {/* ── Content ── */}
+      <div style={{position:"relative",zIndex:5}}>
+
+        {activeTab==="map" && (
+          <div style={{animation:"fadeIn 0.3s ease"}}>
+            <div style={{padding:"12px 16px 0"}}>
+              <MapView allListings={liveListings} visibleIds={new Set(filteredListings.map(l=>l.id))} selectedId={selectedId} onSelect={setSelectedId} routeMode={routeMode} routeStops={routeStops} onBoundsChange={setMapBounds}/>
+            </div>
+            {routeStops.length>0 && (
+              <div style={{padding:"12px 16px 0"}}>
+                <RoutePanel stops={routeStops} listings={liveListings} onRemove={id=>setRouteStops(s=>s.filter(x=>x!==id))} onClear={()=>{setRouteStops([]);setRouteMode(false);}} onReorder={setRouteStops}/>
+              </div>
+            )}
+            <div style={{padding:"12px 16px 4px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <span style={{fontSize:11,fontFamily:"var(--ff-mono)",color:"var(--muted)"}}>{filteredListings.length} listing{filteredListings.length!==1?"s":""} in view</span>
+                {hiddenIds.size > 0 && (
+                  <button onClick={()=>{if(window.confirm(`Restore all ${hiddenIds.size} hidden listing${hiddenIds.size!==1?"s":""}?`)){[...hiddenIds].forEach(unhideId);}}} style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"var(--muted)",background:"none",border:"1px solid var(--border)",borderRadius:4,padding:"1px 7px",cursor:"pointer"}}>
+                    👻 {hiddenIds.size} hidden
+                  </button>
+                )}
+              </div>
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                {flaggedInView.length > 0 && <span style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"#C8856A",background:"#2A1E1A",padding:"2px 8px",borderRadius:4}}>🚩 {flaggedInView.length} filtered</span>}
+                {filters.maxDistance<200 && <span style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"var(--accent)",background:"var(--accent-bg)",padding:"2px 8px",borderRadius:4}}>within {filters.maxDistance}mi</span>}
+              </div>
+            </div>
+            <div style={{padding:"4px 16px 100px"}}>
+              {filteredListings.map(l=>(
+                <ListingCard key={l.id} listing={l} isSelected={selectedId===l.id} isFavorite={favorites.includes(l.id)} isRouteStop={routeStops.includes(l.id)} routeIndex={routeStops.indexOf(l.id)} onSelect={setSelectedId} onFavorite={toggleFavorite} onAddRoute={toggleRouteStop} onUnflag={handleUnflag} isClosed={closedIds.has(l.id)} isVerify={verifyIds.has(l.id)} onMarkClosed={markClosed} onMarkVerify={markVerify} onClearStatus={clearStatus} isBeenThere={beenThereIds.has(l.id)} onToggleBeenThere={toggleBeenThere} onHide={hideId}/>
+              ))}
+              {flaggedInView.length > 0 && (
+                <div style={{marginTop:12,paddingTop:10,borderTop:"1px dashed #3A2A20"}}>
+                  <p style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"#6A4A38",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:8}}>Auto-filtered · tap Keep to restore</p>
+                  {flaggedInView.map(l=>(
+                    <ListingCard key={l.id} listing={l} isSelected={false} isFavorite={false} isRouteStop={false} routeIndex={-1} onSelect={()=>{}} onFavorite={()=>{}} onAddRoute={()=>{}} onUnflag={handleUnflag} isClosed={false} isVerify={false} onMarkClosed={()=>{}} onMarkVerify={()=>{}} onClearStatus={()=>{}}/>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab==="favorites" && (
+          <div style={{padding:"16px",animation:"fadeIn 0.3s ease"}}>
+            <h3 style={{fontFamily:"var(--ff-heading)",fontSize:18,marginBottom:12,color:"var(--text)"}}>Saved Listings</h3>
+            {favoriteListings.length===0 ? (
+              <p style={{color:"var(--muted)",fontSize:13}}>No saved listings yet. Tap ❤️ on any listing.</p>
+            ) : favoriteListings.map(l=>(
+              <ListingCard key={l.id} listing={l} isSelected={selectedId===l.id} isFavorite={true} isRouteStop={routeStops.includes(l.id)} routeIndex={routeStops.indexOf(l.id)} onSelect={setSelectedId} onFavorite={toggleFavorite} onAddRoute={toggleRouteStop} onUnflag={handleUnflag} isClosed={closedIds.has(l.id)} isVerify={verifyIds.has(l.id)} onMarkClosed={markClosed} onMarkVerify={markVerify} onClearStatus={clearStatus} isBeenThere={beenThereIds.has(l.id)} onToggleBeenThere={toggleBeenThere} onHide={hideId}/>
+            ))}
+          </div>
+        )}
+
+        {activeTab==="groups" && (
+          <div style={{padding:"16px",animation:"fadeIn 0.3s ease"}}><GroupPanel groups={GROUPS} routeStops={routeStops} listings={liveListings}/></div>
+        )}
+
+        {activeTab==="alerts" && (
+          <div style={{padding:"16px",animation:"fadeIn 0.3s ease"}}><AlertPanel alerts={alerts} setAlerts={setAlerts}/></div>
+        )}
+      </div>
+
+      {showFilters && <FilterPanel filters={filters} setFilters={setFilters} onClose={()=>setShowFilters(false)}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<Fade & Find/>);
+</script>
+</body>
+</html>
