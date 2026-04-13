@@ -948,13 +948,21 @@ function FadeAndFind() {
   const [routeMode,    setRouteMode]     = useState(false);
   const [showFilters,  setShowFilters]   = useState(false);
   const [activeTab,    setActiveTab]     = useState("map");
-  const [filters,      setFilters]       = useState({
-    categories: Object.keys(CATEGORIES),
-    maxDistance: 200,
-    sortBy: "distance",
-    featuredOnly: false,
-    tagSearch: "",
+  const [filters,      setFiltersRaw]    = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("ff_filters") || "null");
+      if (saved) return { ...{ categories: Object.keys(CATEGORIES), maxDistance: 200, sortBy: "distance", featuredOnly: false, tagSearch: "" }, ...saved };
+    } catch {}
+    return { categories: Object.keys(CATEGORIES), maxDistance: 200, sortBy: "distance", featuredOnly: false, tagSearch: "" };
   });
+
+  const setFilters = (updater) => {
+    setFiltersRaw(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      try { localStorage.setItem("ff_filters", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
   const [alerts, setAlerts] = useState({ newEstates:true, auctionReminders:true, tagMatches:false });
   const [searchText, setSearchText] = useState("");
   const [mapBounds, setMapBounds] = useState(null);
