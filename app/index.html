@@ -819,7 +819,7 @@ const AlertPanel = ({ alerts, setAlerts }) => (
 
 // ── Start Screen — combined location + auth ───────────
 const StartScreen = ({ user, onLoad, onAuth }) => {
-  const [tab, setTab]       = useState(user ? "find" : "find"); // always start on find
+  const [tab, setTab]       = useState("find");
   const [authMode, setAuthMode] = useState("login");
   const [email, setEmail]   = useState("");
   const [password, setPassword] = useState("");
@@ -827,7 +827,9 @@ const StartScreen = ({ user, onLoad, onAuth }) => {
   const [authLoading, setAuthLoading] = useState(false);
   const [status, setStatus] = useState("idle");
   const [locError, setLocError] = useState("");
-  const [zip, setZip]       = useState("");
+  const [zip, setZip]       = useState(() => {
+    try { return localStorage.getItem("ff_last_zip") || ""; } catch { return ""; }
+  });
   const [radius, setRadius] = useState(() => {
     try { return parseInt(localStorage.getItem("ff_radius") || "100"); } catch { return 100; }
   });
@@ -869,14 +871,16 @@ const StartScreen = ({ user, onLoad, onAuth }) => {
     );
   };
 
-  const handleZipSearch = async () => {
-    if (!zip.trim()) return;
+  const handleZipSearch = async (zipOverride) => {
+    const searchZip = zipOverride || zip;
+    if (!searchZip.trim()) return;
     setStatus("locating"); setLocError("");
     try {
-      const resp = await fetch(`https://nominatim.openstreetmap.org/search?q=${zip}&format=json&limit=1`, { headers: { "User-Agent": "FadeAndFind/1.0" } });
+      const resp = await fetch(`https://nominatim.openstreetmap.org/search?q=${searchZip}&format=json&limit=1`, { headers: { "User-Agent": "FadeAndFind/1.0" } });
       const results = await resp.json();
       if (!results.length) throw new Error("Location not found");
-      loadFromSupabase(parseFloat(results[0].lat), parseFloat(results[0].lon), radius, zip);
+      try { localStorage.setItem("ff_last_zip", searchZip); } catch {}
+      loadFromSupabase(parseFloat(results[0].lat), parseFloat(results[0].lon), radius, searchZip);
     } catch (e) { setLocError(`Couldn't find that location: ${e.message}`); setStatus("error"); }
   };
 
@@ -886,8 +890,19 @@ const StartScreen = ({ user, onLoad, onAuth }) => {
       const result = authMode === "login"
         ? await db.auth.signInWithPassword({ email, password })
         : await db.auth.signUp({ email, password });
-      if (result.error) setAuthError(result.error.message);
-      else onAuth(result.data.user);
+      if (result.error) { setAuthError(result.error.message); }
+      else {
+        onAuth(result.data.user);
+        // Auto-search if we have a saved zip
+        const savedZip = localStorage.getItem("ff_last_zip");
+        if (savedZip) {
+          setZip(savedZip);
+          setTab("find");
+          handleZipSearch(savedZip);
+        } else {
+          setTab("find");
+        }
+      }
     } catch { setAuthError("Something went wrong. Try again."); }
     setAuthLoading(false);
   };
@@ -923,7 +938,7 @@ const StartScreen = ({ user, onLoad, onAuth }) => {
               <p style={{textAlign:"center", fontSize:11, color:"var(--muted)", fontFamily:"var(--ff-mono)", marginBottom:10}}>— or enter a zip code —</p>
               <div style={{display:"flex", gap:8}}>
                 <input type="text" placeholder="e.g. 68008" value={zip} onChange={e=>setZip(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleZipSearch()} disabled={isLoading} style={{...inputStyle, marginBottom:0, flex:1}}/>
-                <button onClick={handleZipSearch} disabled={isLoading||!zip.trim()} style={{padding:"10px 16px", borderRadius:8, border:"1px solid var(--accent)", background:"transparent", color:"var(--accent)", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"var(--ff-mono)"}}>Go</button>
+                <button onClick={()=>handleZipSearch()} disabled={isLoading||!zip.trim()} style={{padding:"10px 16px", borderRadius:8, border:"1px solid var(--accent)", background:"transparent", color:"var(--accent)", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"var(--ff-mono)"}}>Go</button>
               </div>
               {locError && <p style={{fontSize:12, color:"#C45A5A", marginTop:10, fontFamily:"var(--ff-mono)"}}>{locError}</p>}
               {!user && <p style={{fontSize:11, color:"var(--muted)", fontFamily:"var(--ff-mono)", marginTop:14, textAlign:"center"}}>Browsing as guest — <span onClick={()=>setTab("account")} style={{color:"var(--accent)", cursor:"pointer", textDecoration:"underline"}}>sign in</span> to save favorites & routes.</p>}
