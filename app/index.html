@@ -1025,12 +1025,37 @@ function FadeAndFind() {
     db.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setAuthChecked(true);
+      // Auto-load for returning logged-in users with a saved zip
+      if (session?.user) {
+        const savedZip = localStorage.getItem("ff_last_zip");
+        const savedRadius = parseInt(localStorage.getItem("ff_radius") || "100");
+        if (savedZip) {
+          autoLoadZip(savedZip, savedRadius);
+        }
+      }
     });
     const { data: { subscription } } = db.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  const autoLoadZip = async (zip, radius) => {
+    try {
+      const resp = await fetch(`https://nominatim.openstreetmap.org/search?q=${zip}&format=json&limit=1`, { headers: { "User-Agent": "FadeAndFind/1.0" } });
+      const results = await resp.json();
+      if (!results.length) return;
+      const lat = parseFloat(results[0].lat);
+      const lng = parseFloat(results[0].lon);
+      const latDelta = radius / 69;
+      const lngDelta = radius / 53;
+      const url = `${SUPA_URL}/rest/v1/listings?lat=gte.${lat - latDelta}&lat=lte.${lat + latDelta}&lng=gte.${lng - lngDelta}&lng=lte.${lng + lngDelta}&select=*&limit=500`;
+      const dbResp = await fetch(url, { headers: { "apikey": SUPA_KEY, "Authorization": `Bearer ${SUPA_KEY}` } });
+      if (!dbResp.ok) return;
+      const raw = await dbResp.json();
+      if (raw.length) setLiveListings(raw.map((r, i) => transformListing(r, i)));
+    } catch {}
+  };
 
   // ── Load user data from Supabase when user logs in ──
   useEffect(() => {
