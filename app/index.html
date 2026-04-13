@@ -817,17 +817,29 @@ const AlertPanel = ({ alerts, setAlerts }) => (
   </div>
 );
 
-// ── Location Screen — replaces JSON file loader ──────
-const LocationScreen = ({ onLoad }) => {
-  const [status,  setStatus]  = useState("idle"); // idle | locating | loading | error
-  const [error,   setError]   = useState("");
-  const [zip,     setZip]     = useState("");
-  const [radius,  setRadius]  = useState(100);
+// ── Start Screen — combined location + auth ───────────
+const StartScreen = ({ user, onLoad, onAuth }) => {
+  const [tab, setTab]       = useState(user ? "find" : "find"); // always start on find
+  const [authMode, setAuthMode] = useState("login");
+  const [email, setEmail]   = useState("");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [status, setStatus] = useState("idle");
+  const [locError, setLocError] = useState("");
+  const [zip, setZip]       = useState("");
+  const [radius, setRadius] = useState(() => {
+    try { return parseInt(localStorage.getItem("ff_radius") || "100"); } catch { return 100; }
+  });
+
+  const saveRadius = (r) => {
+    setRadius(r);
+    try { localStorage.setItem("ff_radius", String(r)); } catch {}
+  };
 
   const loadFromSupabase = async (lat, lng, radiusMiles, label) => {
     setStatus("loading");
     try {
-      // Rough bounding box (1 degree lat ≈ 69mi, 1 degree lng ≈ 53mi at 41°N)
       const latDelta = radiusMiles / 69;
       const lngDelta = radiusMiles / 53;
       const url = `${SUPA_URL}/rest/v1/listings?lat=gte.${lat - latDelta}&lat=lte.${lat + latDelta}&lng=gte.${lng - lngDelta}&lng=lte.${lng + lngDelta}&select=*&limit=500`;
@@ -837,100 +849,119 @@ const LocationScreen = ({ onLoad }) => {
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const raw = await resp.json();
       if (!raw.length) {
-        setError("No listings found in this area yet. Try a larger radius or check back after the next scrape.");
+        setLocError("No listings found in this area yet. Try a larger radius.");
         setStatus("error");
         return;
       }
-      const listings = raw.map((r, i) => transformListing(r, i));
-      onLoad(listings, label);
+      onLoad(raw.map((r, i) => transformListing(r, i)), label);
     } catch (e) {
-      setError(`Couldn't load listings: ${e.message}`);
+      setLocError(`Couldn't load listings: ${e.message}`);
       setStatus("error");
     }
   };
 
   const handleUseLocation = () => {
-    setStatus("locating");
-    setError("");
-    if (!navigator.geolocation) {
-      setError("Location not supported — try entering a zip code.");
-      setStatus("error");
-      return;
-    }
+    setStatus("locating"); setLocError("");
+    if (!navigator.geolocation) { setLocError("Location not supported — try a zip code."); setStatus("error"); return; }
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        loadFromSupabase(latitude, longitude, radius, "Your Location");
-      },
-      () => {
-        setError("Location access denied — enter a zip code instead.");
-        setStatus("error");
-      }
+      (pos) => loadFromSupabase(pos.coords.latitude, pos.coords.longitude, radius, "Your Location"),
+      () => { setLocError("Location denied — enter a zip code instead."); setStatus("error"); }
     );
   };
 
   const handleZipSearch = async () => {
     if (!zip.trim()) return;
-    setStatus("locating");
-    setError("");
+    setStatus("locating"); setLocError("");
     try {
-      const resp = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${zip}&format=json&limit=1`,
-        { headers: { "User-Agent": "FadeAndFind/1.0" } }
-      );
+      const resp = await fetch(`https://nominatim.openstreetmap.org/search?q=${zip}&format=json&limit=1`, { headers: { "User-Agent": "FadeAndFind/1.0" } });
       const results = await resp.json();
-      if (!results.length) throw new Error("Zip code not found");
-      const lat = parseFloat(results[0].lat);
-      const lng = parseFloat(results[0].lon);
-      loadFromSupabase(lat, lng, radius, zip);
-    } catch (e) {
-      setError(`Couldn't find that location: ${e.message}`);
-      setStatus("error");
-    }
+      if (!results.length) throw new Error("Location not found");
+      loadFromSupabase(parseFloat(results[0].lat), parseFloat(results[0].lon), radius, zip);
+    } catch (e) { setLocError(`Couldn't find that location: ${e.message}`); setStatus("error"); }
+  };
+
+  const handleAuth = async () => {
+    setAuthError(""); setAuthLoading(true);
+    try {
+      const result = authMode === "login"
+        ? await db.auth.signInWithPassword({ email, password })
+        : await db.auth.signUp({ email, password });
+      if (result.error) setAuthError(result.error.message);
+      else onAuth(result.data.user);
+    } catch { setAuthError("Something went wrong. Try again."); }
+    setAuthLoading(false);
   };
 
   const isLoading = status === "locating" || status === "loading";
+  const inputStyle = { width:"100%", padding:"10px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--bg)", color:"var(--text)", fontSize:14, outline:"none", fontFamily:"var(--ff-mono)", marginBottom:10 };
 
   return (
-    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24,padding:32,background:"var(--bg)"}}>
-      <h1 style={{fontFamily:"'Playfair Display',Georgia,serif",fontSize:40,fontWeight:900,background:"linear-gradient(135deg,#2C1810 0%,#C4922A 100%)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Fade & Find</h1>
-      <p style={{fontFamily:"monospace",fontSize:11,color:"var(--muted)",letterSpacing:"0.15em",textTransform:"uppercase"}}>Where forgotten things find new homes.</p>
-      <div style={{maxWidth:360,width:"100%",padding:28,background:"var(--card-bg)",borderRadius:14,border:"1px solid var(--border)",textAlign:"center"}}>
+    <div style={{minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:20, padding:"32px 20px", background:"var(--bg)"}}>
+      <h1 style={{fontFamily:"'Playfair Display',Georgia,serif", fontSize:38, fontWeight:900, background:"linear-gradient(135deg,#2C1810 0%,#C4922A 100%)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", textAlign:"center"}}>Fade & Find</h1>
+      <p style={{fontFamily:"monospace", fontSize:11, color:"var(--muted)", letterSpacing:"0.15em", textTransform:"uppercase", marginTop:-12}}>Where forgotten things find new homes.</p>
 
-        {/* Radius selector */}
-        <div style={{marginBottom:20}}>
-          <label style={{fontSize:11,fontFamily:"var(--ff-mono)",color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.1em",display:"block",marginBottom:8}}>Search radius: {radius} miles</label>
-          <input type="range" min={25} max={200} step={25} value={radius} onChange={e=>setRadius(+e.target.value)} style={{width:"100%",accentColor:"var(--accent)"}}/>
+      <div style={{maxWidth:400, width:"100%", background:"var(--card-bg)", borderRadius:16, border:"1px solid var(--border)", overflow:"hidden"}}>
+        {/* Tabs */}
+        <div style={{display:"flex", borderBottom:"1px solid var(--border)"}}>
+          {[{key:"find", label:"🗺️ Find Near Me"}, {key:"account", label:"👤 Sign In"}].map(t => (
+            <button key={t.key} onClick={()=>setTab(t.key)} style={{flex:1, padding:"14px 8px", border:"none", background: tab===t.key ? "var(--card-bg)" : "var(--bg)", cursor:"pointer", fontFamily:"var(--ff-mono)", fontSize:12, fontWeight: tab===t.key ? 700 : 400, color: tab===t.key ? "var(--accent)" : "var(--muted)", borderBottom: tab===t.key ? `2px solid var(--accent)` : "2px solid transparent", transition:"all 0.2s"}}>
+              {t.label}
+            </button>
+          ))}
         </div>
 
-        {/* Use my location */}
-        <button
-          onClick={handleUseLocation}
-          disabled={isLoading}
-          style={{width:"100%",padding:"13px 20px",borderRadius:8,border:"none",background:"var(--accent)",color:"#F5EFE0",fontSize:14,fontWeight:700,cursor:isLoading?"default":"pointer",fontFamily:"'Playfair Display',Georgia,serif",marginBottom:12,opacity:isLoading?0.7:1}}
-        >
-          {status==="locating" ? "📍 Getting location..." : status==="loading" ? "⏳ Loading listings..." : "📍 Use My Location"}
-        </button>
+        <div style={{padding:24}}>
+          {tab === "find" && (
+            <>
+              <div style={{marginBottom:18}}>
+                <label style={{fontSize:11, fontFamily:"var(--ff-mono)", color:"var(--muted)", textTransform:"uppercase", letterSpacing:"0.1em", display:"block", marginBottom:8}}>Search radius: {radius} miles</label>
+                <input type="range" min={25} max={200} step={25} value={radius} onChange={e=>saveRadius(+e.target.value)} style={{width:"100%", accentColor:"var(--accent)"}}/>
+              </div>
+              <button onClick={handleUseLocation} disabled={isLoading} style={{width:"100%", padding:"13px", borderRadius:8, border:"none", background:"var(--accent)", color:"#F5EFE0", fontSize:14, fontWeight:700, cursor:isLoading?"default":"pointer", fontFamily:"'Playfair Display',Georgia,serif", marginBottom:12, opacity:isLoading?0.7:1}}>
+                {status==="locating" ? "📍 Getting location..." : status==="loading" ? "⏳ Loading listings..." : "📍 Use My Location"}
+              </button>
+              <p style={{textAlign:"center", fontSize:11, color:"var(--muted)", fontFamily:"var(--ff-mono)", marginBottom:10}}>— or enter a zip code —</p>
+              <div style={{display:"flex", gap:8}}>
+                <input type="text" placeholder="e.g. 68008" value={zip} onChange={e=>setZip(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleZipSearch()} disabled={isLoading} style={{...inputStyle, marginBottom:0, flex:1}}/>
+                <button onClick={handleZipSearch} disabled={isLoading||!zip.trim()} style={{padding:"10px 16px", borderRadius:8, border:"1px solid var(--accent)", background:"transparent", color:"var(--accent)", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"var(--ff-mono)"}}>Go</button>
+              </div>
+              {locError && <p style={{fontSize:12, color:"#C45A5A", marginTop:10, fontFamily:"var(--ff-mono)"}}>{locError}</p>}
+              {!user && <p style={{fontSize:11, color:"var(--muted)", fontFamily:"var(--ff-mono)", marginTop:14, textAlign:"center"}}>Browsing as guest — <span onClick={()=>setTab("account")} style={{color:"var(--accent)", cursor:"pointer", textDecoration:"underline"}}>sign in</span> to save favorites & routes.</p>}
+            </>
+          )}
 
-        <p style={{fontSize:11,color:"var(--muted)",fontFamily:"var(--ff-mono)",marginBottom:12}}>— or enter a zip code —</p>
-
-        {/* Zip code search */}
-        <div style={{display:"flex",gap:8}}>
-          <input
-            type="text" placeholder="e.g. 68008" value={zip}
-            onChange={e=>setZip(e.target.value)}
-            onKeyDown={e=>e.key==="Enter"&&handleZipSearch()}
-            disabled={isLoading}
-            style={{flex:1,padding:"10px 12px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg)",color:"var(--text)",fontSize:14,outline:"none",fontFamily:"var(--ff-mono)"}}
-          />
-          <button
-            onClick={handleZipSearch}
-            disabled={isLoading||!zip.trim()}
-            style={{padding:"10px 16px",borderRadius:8,border:"1px solid var(--accent)",background:"transparent",color:"var(--accent)",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"var(--ff-mono)"}}
-          >Go</button>
+          {tab === "account" && (
+            <>
+              {user ? (
+                <div style={{textAlign:"center", padding:"16px 0"}}>
+                  <div style={{fontSize:32, marginBottom:12}}>✅</div>
+                  <p style={{fontSize:14, color:"var(--text)", fontFamily:"var(--ff-heading)", marginBottom:8}}>Signed in as</p>
+                  <p style={{fontSize:13, color:"var(--muted)", fontFamily:"var(--ff-mono)", marginBottom:20}}>{user.email}</p>
+                  <button onClick={()=>setTab("find")} style={{padding:"12px 28px", borderRadius:8, border:"none", background:"var(--accent)", color:"#F5EFE0", fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"var(--ff-heading)"}}>Find Listings →</button>
+                </div>
+              ) : (
+                <>
+                  <h3 style={{fontFamily:"var(--ff-heading)", fontSize:17, color:"var(--text)", marginBottom:16, textAlign:"center"}}>{authMode==="login" ? "Welcome back" : "Create your account"}</h3>
+                  <input type="email" placeholder="Email address" value={email} onChange={e=>setEmail(e.target.value)} style={inputStyle}/>
+                  <input type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} style={inputStyle}/>
+                  {authError && <p style={{fontSize:12, color:"#C45A5A", marginBottom:10, fontFamily:"var(--ff-mono)"}}>{authError}</p>}
+                  <button onClick={handleAuth} disabled={authLoading} style={{width:"100%", padding:"12px", borderRadius:8, border:"none", background:"var(--accent)", color:"#F5EFE0", fontSize:14, fontWeight:700, cursor:authLoading?"default":"pointer", fontFamily:"var(--ff-heading)", opacity:authLoading?0.7:1, marginBottom:12}}>
+                    {authLoading ? "Please wait..." : authMode==="login" ? "Sign In" : "Create Account"}
+                  </button>
+                  <p style={{textAlign:"center", fontSize:12, color:"var(--muted)", fontFamily:"var(--ff-mono)"}}>
+                    {authMode==="login" ? "New here? " : "Have an account? "}
+                    <span onClick={()=>{setAuthMode(authMode==="login"?"signup":"login"); setAuthError("");}} style={{color:"var(--accent)", cursor:"pointer", textDecoration:"underline"}}>
+                      {authMode==="login" ? "Create account" : "Sign in"}
+                    </span>
+                  </p>
+                  <p style={{textAlign:"center", marginTop:8}}>
+                    <span onClick={()=>setTab("find")} style={{fontSize:11, color:"var(--muted)", fontFamily:"var(--ff-mono)", cursor:"pointer", textDecoration:"underline"}}>Continue as guest instead</span>
+                  </p>
+                </>
+              )}
+            </>
+          )}
         </div>
-
-        {error && <p style={{fontSize:12,color:"#C45A5A",marginTop:12,fontFamily:"var(--ff-mono)",textAlign:"left"}}>{error}</p>}
       </div>
     </div>
   );
@@ -1075,11 +1106,15 @@ function FadeAndFind() {
   // Guest mode — no hard wall, just limited features
   const isGuest = !user;
 
-  // Show location screen until listings are loaded
+  // Show combined location + auth screen until listings are loaded
   if (liveListings === null) {
     return (
       <div style={cssVars}>
-        <LocationScreen onLoad={(listings, label) => { setLiveListings(listings); setLoadedFrom(label); }} />
+        <StartScreen
+          user={user}
+          onLoad={(listings, label) => { setLiveListings(listings); setLoadedFrom(label); }}
+          onAuth={setUser}
+        />
       </div>
     );
   }
