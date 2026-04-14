@@ -650,7 +650,7 @@ const PremiumGate = ({ children, isPremium, isGuest, feature, onSignUp }) => {
 
   if (isPremium) return children;
 
-  const handleUpgrade = async () => {
+  const { data: { user } } = await db.auth.getUser();
     if (isGuest) { setShowPrompt(false); onSignUp && onSignUp(); return; }
     setLoading(true);
     setCheckoutError("");
