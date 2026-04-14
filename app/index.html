@@ -655,7 +655,9 @@ const PremiumGate = ({ children, isPremium, isGuest, feature, onSignUp }) => {
     setLoading(true);
     setCheckoutError("");
     try {
-      const { data: { user } } = await db.auth.getUser();
+      const { data: { session } } = await db.auth.getSession();
+      const user = session?.user;
+      if (!user) { setCheckoutError("Please sign in again."); setLoading(false); return; }
       const priceId = billing === "annual" ? ANNUAL_PRICE_ID : MONTHLY_PRICE_ID;
       const res = await fetch("/api/create-checkout", {
         method: "POST",
