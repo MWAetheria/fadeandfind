@@ -639,10 +639,41 @@ function buildGoogleMapsUrl(listings) {
 }
 
 // ── Premium Gate ──────────────────────────────────────
+const MONTHLY_PRICE_ID = "price_1TMAncPyw8l0vrgFSh3j9kIy";
+const ANNUAL_PRICE_ID  = "price_1TMAncPyw8l0vrgFg35WrJN8";
+
 const PremiumGate = ({ children, isPremium, isGuest, feature, onSignUp }) => {
   const [showPrompt, setShowPrompt] = React.useState(false);
+  const [billing, setBilling]       = React.useState("monthly"); // monthly | annual
+  const [loading, setLoading]       = React.useState(false);
+  const [checkoutError, setCheckoutError] = React.useState("");
 
   if (isPremium) return children;
+
+  const handleUpgrade = async () => {
+    if (isGuest) { setShowPrompt(false); onSignUp && onSignUp(); return; }
+    setLoading(true);
+    setCheckoutError("");
+    try {
+      const { data: { user } } = await db.auth.getUser();
+      const priceId = billing === "annual" ? ANNUAL_PRICE_ID : MONTHLY_PRICE_ID;
+      const res = await fetch("/api/create-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceId, userId: user.id, userEmail: user.email }),
+      });
+      const json = await res.json();
+      if (json.url) {
+        window.location.href = json.url;
+      } else {
+        setCheckoutError("Something went wrong. Please try again.");
+        setLoading(false);
+      }
+    } catch (e) {
+      setCheckoutError("Something went wrong. Please try again.");
+      setLoading(false);
+    }
+  };
 
   return (
     <div style={{position:"relative"}}>
@@ -660,12 +691,34 @@ const PremiumGate = ({ children, isPremium, isGuest, feature, onSignUp }) => {
           <div style={{background:"var(--bg)",borderRadius:16,padding:32,maxWidth:340,width:"100%",textAlign:"center",boxShadow:"0 8px 40px rgba(0,0,0,0.2)"}} onClick={e=>e.stopPropagation()}>
             <div style={{fontSize:36,marginBottom:12}}>⭐</div>
             <h3 style={{fontFamily:"var(--ff-heading)",fontSize:20,fontWeight:900,marginBottom:8,color:"var(--text)"}}>Upgrade to Premium</h3>
-            <p style={{fontSize:13,color:"var(--muted)",marginBottom:8,lineHeight:1.6}}><strong style={{color:"var(--text)"}}>{feature}</strong> is a Premium feature.</p>
-            <p style={{fontSize:13,color:"var(--muted)",marginBottom:24,lineHeight:1.6}}>Get route optimization, group sharing, alerts, tag search, and early access for just <strong style={{color:"var(--accent)"}}>$4.99/month</strong>.</p>
+            <p style={{fontSize:13,color:"var(--muted)",marginBottom:16,lineHeight:1.6}}>
+              <strong style={{color:"var(--text)"}}>{feature}</strong> is a Premium feature.
+              Get route optimization, group sharing, alerts, and more.
+            </p>
+
+            {/* Billing toggle */}
+            {!isGuest && (
+              <div style={{display:"flex",borderRadius:8,border:"1px solid var(--border)",overflow:"hidden",marginBottom:20}}>
+                <button
+                  onClick={()=>setBilling("monthly")}
+                  style={{flex:1,padding:"10px",border:"none",cursor:"pointer",fontFamily:"var(--ff-mono)",fontSize:12,fontWeight:billing==="monthly"?700:400,background:billing==="monthly"?"var(--accent)":"transparent",color:billing==="monthly"?"#F5EFE0":"var(--muted)",transition:"all 0.2s"}}
+                >$4.99 / mo</button>
+                <button
+                  onClick={()=>setBilling("annual")}
+                  style={{flex:1,padding:"10px",border:"none",cursor:"pointer",fontFamily:"var(--ff-mono)",fontSize:12,fontWeight:billing==="annual"?700:400,background:billing==="annual"?"var(--accent)":"transparent",color:billing==="annual"?"#F5EFE0":"var(--muted)",transition:"all 0.2s"}}
+                >$39.99 / yr <span style={{fontSize:10,opacity:0.8}}>Save 33%</span></button>
+              </div>
+            )}
+
+            {checkoutError && (
+              <p style={{fontSize:12,color:"#C86A6A",marginBottom:12,fontFamily:"var(--ff-mono)"}}>{checkoutError}</p>
+            )}
+
             <button
-              onClick={()=>{ setShowPrompt(false); if(isGuest && onSignUp) onSignUp(); }}
-              style={{width:"100%",padding:"13px",borderRadius:8,border:"none",background:"var(--accent)",color:"#F5EFE0",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"var(--ff-heading)",marginBottom:10}}
-            >{isGuest ? "Create Free Account →" : "Upgrade to Premium →"}</button>
+              onClick={handleUpgrade}
+              disabled={loading}
+              style={{width:"100%",padding:"13px",borderRadius:8,border:"none",background:"var(--accent)",color:"#F5EFE0",fontSize:14,fontWeight:700,cursor:loading?"default":"pointer",fontFamily:"var(--ff-heading)",marginBottom:10,opacity:loading?0.7:1}}
+            >{loading ? "Redirecting to checkout..." : isGuest ? "Create Free Account →" : "Upgrade to Premium →"}</button>
             <button onClick={()=>setShowPrompt(false)} style={{width:"100%",padding:"10px",borderRadius:8,border:"1px solid var(--border)",background:"transparent",color:"var(--muted)",fontSize:13,cursor:"pointer",fontFamily:"var(--ff-mono)"}}>Maybe later</button>
           </div>
         </div>
@@ -673,6 +726,7 @@ const PremiumGate = ({ children, isPremium, isGuest, feature, onSignUp }) => {
     </div>
   );
 };
+
 
 // ── Route Panel ───────────────────────────────────────
 const RoutePanel = ({ stops, listings, onRemove, onClear, onReorder }) => {
