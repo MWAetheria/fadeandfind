@@ -642,9 +642,9 @@ function buildGoogleMapsUrl(listings) {
 const MONTHLY_PRICE_ID = "price_1TMAncPyw8l0vrgFSh3j9kIy";
 const ANNUAL_PRICE_ID  = "price_1TMAncPyw8l0vrgFg35WrJN8";
 
-const PremiumGate = ({ children, isPremium, isGuest, feature, onSignUp }) => {
+const PremiumGate = ({ children, isPremium, isGuest, feature, onSignUp, user }) => {
   const [showPrompt, setShowPrompt] = React.useState(false);
-  const [billing, setBilling]       = React.useState("monthly"); // monthly | annual
+  const [billing, setBilling]       = React.useState("monthly");
   const [loading, setLoading]       = React.useState(false);
   const [checkoutError, setCheckoutError] = React.useState("");
 
@@ -652,12 +652,10 @@ const PremiumGate = ({ children, isPremium, isGuest, feature, onSignUp }) => {
 
   const handleUpgrade = async () => {
     if (isGuest) { setShowPrompt(false); onSignUp && onSignUp(); return; }
+    if (!user) { setCheckoutError("Please sign in again."); return; }
     setLoading(true);
     setCheckoutError("");
     try {
-      const { data: { session } } = await db.auth.getSession();
-      const user = session?.user;
-      if (!user) { setCheckoutError("Please sign in again."); setLoading(false); return; }
       const priceId = billing === "annual" ? ANNUAL_PRICE_ID : MONTHLY_PRICE_ID;
       const res = await fetch("/api/create-checkout", {
         method: "POST",
@@ -697,8 +695,6 @@ const PremiumGate = ({ children, isPremium, isGuest, feature, onSignUp }) => {
               <strong style={{color:"var(--text)"}}>{feature}</strong> is a Premium feature.
               Get route optimization, group sharing, alerts, and more.
             </p>
-
-            {/* Billing toggle */}
             {!isGuest && (
               <div style={{display:"flex",borderRadius:8,border:"1px solid var(--border)",overflow:"hidden",marginBottom:20}}>
                 <button
@@ -711,11 +707,9 @@ const PremiumGate = ({ children, isPremium, isGuest, feature, onSignUp }) => {
                 >$39.99 / yr <span style={{fontSize:10,opacity:0.8}}>Save 33%</span></button>
               </div>
             )}
-
             {checkoutError && (
               <p style={{fontSize:12,color:"#C86A6A",marginBottom:12,fontFamily:"var(--ff-mono)"}}>{checkoutError}</p>
             )}
-
             <button
               onClick={handleUpgrade}
               disabled={loading}
@@ -728,7 +722,6 @@ const PremiumGate = ({ children, isPremium, isGuest, feature, onSignUp }) => {
     </div>
   );
 };
-
 
 // ── Route Panel ───────────────────────────────────────
 const RoutePanel = ({ stops, listings, onRemove, onClear, onReorder }) => {
@@ -1414,7 +1407,7 @@ function FadeAndFind() {
             </div>
             {routeStops.length>0 && (
               <div style={{padding:"12px 16px 0"}}>
-                <PremiumGate isPremium={isPremium} isGuest={isGuest} feature="Route Optimization" onSignUp={()=>setShowAuthModal(true)}>
+                <PremiumGate isPremium={isPremium} isGuest={isGuest} feature="Route Optimization" onSignUp={()=>setShowAuthModal(true)} user={user}>
                   <RoutePanel stops={routeStops} listings={liveListings} onRemove={id=>setRouteStops(s=>s.filter(x=>x!==id))} onClear={()=>{setRouteStops([]);setRouteMode(false);}} onReorder={setRouteStops}/>
                 </PremiumGate>
               </div>
@@ -1472,7 +1465,7 @@ function FadeAndFind() {
 
         {activeTab==="groups" && (
           <div style={{padding:"16px",animation:"fadeIn 0.3s ease"}}>
-            <PremiumGate isPremium={isPremium} isGuest={isGuest} feature="Group Sharing" onSignUp={()=>setShowAuthModal(true)}>
+            <PremiumGate isPremium={isPremium} isGuest={isGuest} feature="Group Sharing" onSignUp={()=>setShowAuthModal(true)} user={user}>
               <GroupPanel routeStops={routeStops} listings={liveListings}/>
             </PremiumGate>
           </div>
@@ -1480,7 +1473,7 @@ function FadeAndFind() {
 
         {activeTab==="alerts" && (
           <div style={{padding:"16px",animation:"fadeIn 0.3s ease"}}>
-            <PremiumGate isPremium={isPremium} isGuest={isGuest} feature="Listing Alerts" onSignUp={()=>setShowAuthModal(true)}>
+            <PremiumGate isPremium={isPremium} isGuest={isGuest} feature="Listing Alerts" onSignUp={()=>setShowAuthModal(true)} user={user}>
               <AlertPanel alerts={alerts} setAlerts={setAlerts}/>
             </PremiumGate>
           </div>
