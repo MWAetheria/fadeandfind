@@ -643,6 +643,42 @@ function buildGoogleMapsUrl(listings) {
   return url;
 }
 
+// ── Premium Gate ──────────────────────────────────────
+const PremiumGate = ({ children, isPremium, isGuest, feature, onSignUp }) => {
+  const [showPrompt, setShowPrompt] = React.useState(false);
+
+  if (isPremium) return children;
+
+  return (
+    <div style={{position:"relative"}}>
+      <div style={{opacity:0.4, pointerEvents:"none", userSelect:"none"}}>{children}</div>
+      <div
+        onClick={()=>setShowPrompt(true)}
+        style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",borderRadius:10,background:"rgba(245,239,224,0.85)",backdropFilter:"blur(2px)"}}
+      >
+        <div style={{fontSize:20,marginBottom:6}}>⭐</div>
+        <div style={{fontSize:13,fontWeight:700,color:"var(--text)",fontFamily:"var(--ff-heading)",marginBottom:4}}>Premium Feature</div>
+        <div style={{fontSize:11,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>{feature}</div>
+      </div>
+      {showPrompt && (
+        <div style={{position:"fixed",inset:0,zIndex:300,background:"rgba(44,24,16,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setShowPrompt(false)}>
+          <div style={{background:"var(--bg)",borderRadius:16,padding:32,maxWidth:340,width:"100%",textAlign:"center",boxShadow:"0 8px 40px rgba(0,0,0,0.2)"}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:36,marginBottom:12}}>⭐</div>
+            <h3 style={{fontFamily:"var(--ff-heading)",fontSize:20,fontWeight:900,marginBottom:8,color:"var(--text)"}}>Upgrade to Premium</h3>
+            <p style={{fontSize:13,color:"var(--muted)",marginBottom:8,lineHeight:1.6}}><strong style={{color:"var(--text)"}}>{feature}</strong> is a Premium feature.</p>
+            <p style={{fontSize:13,color:"var(--muted)",marginBottom:24,lineHeight:1.6}}>Get route optimization, group sharing, alerts, tag search, and early access for just <strong style={{color:"var(--accent)"}}>$4.99/month</strong>.</p>
+            <button
+              onClick={()=>{ setShowPrompt(false); if(isGuest && onSignUp) onSignUp(); }}
+              style={{width:"100%",padding:"13px",borderRadius:8,border:"none",background:"var(--accent)",color:"#F5EFE0",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"var(--ff-heading)",marginBottom:10}}
+            >{isGuest ? "Create Free Account →" : "Upgrade to Premium →"}</button>
+            <button onClick={()=>setShowPrompt(false)} style={{width:"100%",padding:"10px",borderRadius:8,border:"1px solid var(--border)",background:"transparent",color:"var(--muted)",fontSize:13,cursor:"pointer",fontFamily:"var(--ff-mono)"}}>Maybe later</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Route Panel ───────────────────────────────────────
 const RoutePanel = ({ stops, listings, onRemove, onClear, onReorder }) => {
   const [optimized, setOptimized] = React.useState(false);
@@ -1019,6 +1055,7 @@ function FadeAndFind() {
   const [verifyIds,    setVerifyIds]    = useState(new Set());
   const [beenThereIds, setBeenThereIds] = useState(new Set());
   const [hiddenIds,    setHiddenIds]    = useState(new Set());
+  const [isPremium,    setIsPremium]    = useState(false);
 
   // ── Check existing session on mount ──
   useEffect(() => {
@@ -1069,6 +1106,7 @@ function FadeAndFind() {
           setClosedIds(new Set(data.closed_ids || []));
           setVerifyIds(new Set(data.verify_ids || []));
           setManuallyKept(new Set(data.manually_kept || []));
+          setIsPremium(data.is_premium || false);
         }
       });
   }, [user]);
@@ -1288,7 +1326,9 @@ function FadeAndFind() {
             </div>
             {routeStops.length>0 && (
               <div style={{padding:"12px 16px 0"}}>
-                <RoutePanel stops={routeStops} listings={liveListings} onRemove={id=>setRouteStops(s=>s.filter(x=>x!==id))} onClear={()=>{setRouteStops([]);setRouteMode(false);}} onReorder={setRouteStops}/>
+                <PremiumGate isPremium={isPremium} isGuest={isGuest} feature="Route Optimization" onSignUp={()=>setShowAuthModal(true)}>
+                  <RoutePanel stops={routeStops} listings={liveListings} onRemove={id=>setRouteStops(s=>s.filter(x=>x!==id))} onClear={()=>{setRouteStops([]);setRouteMode(false);}} onReorder={setRouteStops}/>
+                </PremiumGate>
               </div>
             )}
             <div style={{padding:"12px 16px 4px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -1343,11 +1383,19 @@ function FadeAndFind() {
         )}
 
         {activeTab==="groups" && (
-          <div style={{padding:"16px",animation:"fadeIn 0.3s ease"}}><GroupPanel groups={GROUPS} routeStops={routeStops} listings={liveListings}/></div>
+          <div style={{padding:"16px",animation:"fadeIn 0.3s ease"}}>
+            <PremiumGate isPremium={isPremium} isGuest={isGuest} feature="Group Sharing" onSignUp={()=>setShowAuthModal(true)}>
+              <GroupPanel groups={GROUPS} routeStops={routeStops} listings={liveListings}/>
+            </PremiumGate>
+          </div>
         )}
 
         {activeTab==="alerts" && (
-          <div style={{padding:"16px",animation:"fadeIn 0.3s ease"}}><AlertPanel alerts={alerts} setAlerts={setAlerts}/></div>
+          <div style={{padding:"16px",animation:"fadeIn 0.3s ease"}}>
+            <PremiumGate isPremium={isPremium} isGuest={isGuest} feature="Listing Alerts" onSignUp={()=>setShowAuthModal(true)}>
+              <AlertPanel alerts={alerts} setAlerts={setAlerts}/>
+            </PremiumGate>
+          </div>
         )}
       </div>
 
@@ -1358,6 +1406,5 @@ function FadeAndFind() {
 
 ReactDOM.createRoot(document.getElementById("root")).render(<FadeAndFind/>);
 </script>
-<script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
