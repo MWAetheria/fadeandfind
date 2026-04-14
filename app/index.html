@@ -35,6 +35,9 @@ const SUPA_URL = "https://dmriqhvmsfxujwiizigg.supabase.co";
 const SUPA_KEY = "sb_publishable_wpboEhLjq2kpfnTkS90nhA_2guN8FZr";
 const db = supabase.createClient(SUPA_URL, SUPA_KEY);
 
+// Module-level user cache — survives Edge tracking prevention blocking storage
+let _currentUser = null;
+
 // ── Auth Screen ───────────────────────────────────────
 const AuthScreen = ({ onAuth }) => {
   const [mode, setMode]       = useState("login"); // login | signup
@@ -652,7 +655,8 @@ const PremiumGate = ({ children, isPremium, isGuest, feature, onSignUp, user }) 
 
   const handleUpgrade = async () => {
     if (isGuest) { setShowPrompt(false); onSignUp && onSignUp(); return; }
-    if (!user) { setCheckoutError("Please sign in again."); return; }
+    const resolvedUser = user || _currentUser;
+    if (!resolvedUser) { setCheckoutError("Please sign in again."); return; }
     setLoading(true);
     setCheckoutError("");
     try {
@@ -660,7 +664,7 @@ const PremiumGate = ({ children, isPremium, isGuest, feature, onSignUp, user }) 
       const res = await fetch("/api/create-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priceId, userId: user.id, userEmail: user.email }),
+        body: JSON.stringify({ priceId, userId: resolvedUser.id, userEmail: resolvedUser.email }),
       });
       const json = await res.json();
       if (json.url) {
@@ -1141,7 +1145,9 @@ function FadeAndFind() {
   // ── Check existing session on mount ──
   useEffect(() => {
     db.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+      const u = session?.user ?? null;
+      _currentUser = u;
+      setUser(u);
       setAuthChecked(true);
       // Auto-load for returning logged-in users with a saved zip
       if (session?.user) {
@@ -1153,7 +1159,9 @@ function FadeAndFind() {
       }
     });
     const { data: { subscription } } = db.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const u = session?.user ?? null;
+      _currentUser = u;
+      setUser(u);
     });
     return () => subscription.unsubscribe();
   }, []);
