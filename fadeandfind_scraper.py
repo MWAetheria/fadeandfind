@@ -614,6 +614,111 @@ def push_to_supabase(listings):
 
 
 # ══════════════════════════════════════════════════════════
+# CLEANUP — remove expired estate sale / auction listings
+# ══════════════════════════════════════════════════════════
+
+MONTH_MAP = {
+    "jan":1,"feb":2,"mar":3,"apr":4,"may":5,"jun":6,
+    "jul":7,"aug":8,"sep":9,"oct":10,"nov":11,"dec":12
+}
+
+def parse_last_date(dates_str):
+    """Extract the latest date mentioned in a dates string. Returns (month, day) or None."""
+    if not dates_str:
+        return None
+    # Find all month+day occurrences e.g. "Apr 12", "Apr 12, 14", "Apr 12 to Apr 14"
+    matches = re.findall(
+        r'(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})',
+        dates_str, re.IGNORECASE
+    )
+    if not matches:
+        return None
+    # Return the last match (end date)
+    month_str, day_str = matches[-1]
+    return MONTH_MAP.get(month_str.lower()[:3]), int(day_str)
+
+
+def cleanup_expired_listings():
+    """Delete estate sale and auction listings whose dates have passed."""
+    print("\n🧹 Cleaning up expired listings...")
+    today = datetime.now(timezone.utc)
+    current_month = today.month
+    current_day   = today.day
+    current_year  = today.year
+
+    endpoint = f"{SUPABASE_URL}/rest/v1/listings"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    # Fetch all non-Google-Places listings with dates
+    try:
+        resp = requests.get(
+            endpoint,
+            params={
+                "select": "id,dates,source,category",
+                "source": "neq.google_places",
+                "dates": "neq.",
+                "limit": 2000,
+            },
+            headers=headers,
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            print(f"   ⚠️  Couldn't fetch listings: {resp.status_code}")
+            return
+        listings = resp.json()
+    except Exception as e:
+        print(f"   ❌ Fetch error: {e}")
+        return
+
+    expired_ids = []
+    for l in listings:
+        if l.get("source") == "google_places":
+            continue
+        parsed = parse_last_date(l.get("dates", ""))
+        if not parsed:
+            continue
+        end_month, end_day = parsed
+        # Treat as expired if end date was before today
+        # For year: if end_month > current_month it's probably from last year
+        if end_month < current_month:
+            expired_ids.append(l["id"])
+        elif end_month == current_month and end_day < current_day:
+            expired_ids.append(l["id"])
+
+    if not expired_ids:
+        print("   ✅ No expired listings found")
+        return
+
+    print(f"   Found {len(expired_ids)} expired listings — deleting...")
+
+    # Delete in batches
+    deleted = 0
+    batch_size = 50
+    for i in range(0, len(expired_ids), batch_size):
+        batch = expired_ids[i:i+batch_size]
+        id_filter = "(" + ",".join(f'"{id}"' for id in batch) + ")"
+        try:
+            del_resp = requests.delete(
+                endpoint,
+                params={"id": f"in.{id_filter}"},
+                headers=headers,
+                timeout=30,
+            )
+            if del_resp.status_code in (200, 204):
+                deleted += len(batch)
+            else:
+                print(f"   ❌ Delete batch failed: {del_resp.status_code}")
+        except Exception as e:
+            print(f"   ❌ Delete error: {e}")
+
+    print(f"   ✅ Deleted {deleted} expired listings")
+
+
+# ══════════════════════════════════════════════════════════
 # MAIN
 # ══════════════════════════════════════════════════════════
 
@@ -625,6 +730,9 @@ def main():
     if not SUPABASE_KEY:
         print("❌ SUPABASE_SERVICE_KEY not set")
         sys.exit(1)
+
+    # Clean up expired listings first
+    cleanup_expired_listings()
 
     metros = DAILY_METROS if MODE == "daily" else US_METROS
     all_listings = []
