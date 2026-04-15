@@ -33,7 +33,7 @@ export default async function handler(req, res) {
       line_items: [{ price: priceId, quantity: 1 }],
       customer_email: userEmail,
       client_reference_id: userId, // Supabase user ID — used in webhook
-      success_url: "https://www.fadeandfind.com/?upgraded=true",
+      success_url: "https://www.fadeandfind.com/app?upgraded=true",
       cancel_url: "https://www.fadeandfind.com/?upgrade=cancelled",
       metadata: {
         supabase_user_id: userId,
