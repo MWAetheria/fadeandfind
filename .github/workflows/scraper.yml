@@ -1,5 +1,5 @@
 name: Fade & Find Scraper
-
+ 
 on:
   schedule:
     - cron: '0 6 * * *'
@@ -15,24 +15,24 @@ on:
           - daily
           - weekly
           - full
-
+ 
 jobs:
   scrape:
     runs-on: ubuntu-latest
     timeout-minutes: 120
-
+ 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-
+ 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
+ 
       - name: Install dependencies
         run: pip install requests beautifulsoup4
-
+ 
       - name: Determine mode
         id: mode
         run: |
@@ -43,10 +43,11 @@ jobs:
           else
             echo "mode=daily" >> $GITHUB_OUTPUT
           fi
-
+ 
       - name: Run scraper
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: python fadeandfind_scraper.py --mode=${{ steps.mode.outputs.mode }}
+ 
