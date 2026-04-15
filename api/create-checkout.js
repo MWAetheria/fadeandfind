@@ -12,8 +12,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   const { priceId, userId, userEmail } = req.body;
-  console.log("CHECKOUT BODY:", JSON.stringify({ priceId, userId, userEmail }));
-
+  
   // Validate priceId is one of the two allowed values
   const allowedPrices = [
     process.env.STRIPE_MONTHLY_PRICE_ID,
