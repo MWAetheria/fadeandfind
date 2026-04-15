@@ -155,7 +155,9 @@ const BOUTIQUE_PATTERNS = [
   /patina/i, /pre.?owned.*cloth/i, /designer.*cloth/i,
 ];
 
-function classifyListing(name, originalCategory) {
+function classifyListing(name, originalCategory, source) {
+  // Google Places auction houses are permanent venues, not events — flag them
+  if (source === "google_places" && originalCategory === "auction") return { category: originalCategory, flagged: true };
   if (BLACKLIST_PATTERNS.some(p => p.test(name))) return { category: originalCategory, flagged: true };
   if (BOUTIQUE_PATTERNS.some(p => p.test(name)))  return { category: "boutique",       flagged: false };
   return { category: originalCategory, flagged: false };
@@ -166,7 +168,7 @@ function transformListing(raw, index) {
   const distNum  = raw.distance ? parseFloat(raw.distance) : 99;
   const addrParts = [raw.address, raw.city, raw.state].filter(p => p && p.trim());
   const name     = raw.name || "Unknown Sale";
-  const { category, flagged } = classifyListing(name, raw.category || "estate");
+  const { category, flagged } = classifyListing(name, raw.category || "estate", raw.source || "estatesales.net");
   return {
     id:          raw.id || String(index),
     name,
