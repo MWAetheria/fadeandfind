@@ -819,6 +819,7 @@ const GroupPanel = ({ routeStops, listings }) => {
   const [showCreate, setShowCreate] = React.useState(false);
   const [newName, setNewName] = React.useState("");
   const [newMembers, setNewMembers] = React.useState("");
+  const [newPhones, setNewPhones] = React.useState("");
 
   const GROUP_COLORS = ["#C4922A","#8B6F47","#6B8E6B","#7B6B8E","#8E6B6B","#6B8E8E"];
   const GROUP_ICONS  = ["⚡","🗺️","🏺","🔍","💎","🌿"];
@@ -831,16 +832,18 @@ const GroupPanel = ({ routeStops, listings }) => {
   const handleCreate = () => {
     if (!newName.trim()) return;
     const members = newMembers.split(",").map(m => m.trim()).filter(Boolean);
+    const phones = newPhones.split(",").map(p => p.trim().replace(/\D/g,'')).filter(p => p.length >= 10);
     const idx = groups.length % GROUP_COLORS.length;
     const newGroup = {
       id: Date.now(),
       name: newName.trim(),
       members: ["You", ...members],
+      phones,
       color: GROUP_COLORS[idx],
       icon: GROUP_ICONS[idx],
     };
     saveGroups([...groups, newGroup]);
-    setNewName(""); setNewMembers(""); setShowCreate(false);
+    setNewName(""); setNewMembers(""); setNewPhones(""); setShowCreate(false);
   };
 
   const handleDelete = (id) => {
@@ -853,12 +856,20 @@ const GroupPanel = ({ routeStops, listings }) => {
     const mapsUrl = buildGoogleMapsUrl(stopListings);
     const lines = [
       `📍 Fade & Find Route — ${new Date().toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}`,
-      `Shared by: You → ${group.name}`, "",
-      ...stopListings.map((l,i) => `${i+1}. ${l.name}  (${l.address})`), "",
-      mapsUrl ? `🗺️ Open in Maps:\n${mapsUrl}` : "",
-    ].filter(l => l !== undefined);
+      `Group: ${group.name}`, "",
+      ...stopListings.map((l,i) => `${i+1}. ${l.name} (${l.address})`), "",
+      mapsUrl ? `🗺️ Maps: ${mapsUrl}` : "",
+    ].filter(Boolean);
     const text = lines.join("\n");
-    if (navigator.share) {
+    // Get phone numbers from group members (filter out "You" and non-phone entries)
+    const phones = (group.phones || []).filter(Boolean);
+    if (phones.length > 0) {
+      // SMS to all phone numbers
+      const to = phones.join(",");
+      window.open(`sms:${to}?body=${encodeURIComponent(text)}`, "_blank");
+      setShared(group.id);
+      setTimeout(() => setShared(null), 2500);
+    } else if (navigator.share) {
       navigator.share({ title: `Fade & Find Route · ${group.name}`, text }).then(() => setShared(group.id)).catch(() => {});
     } else {
       navigator.clipboard?.writeText(text).then(() => { setShared(group.id); setTimeout(() => setShared(null), 2500); });
@@ -896,7 +907,9 @@ const GroupPanel = ({ routeStops, listings }) => {
         {showCreate ? (
           <div style={{marginTop:12,padding:12,borderRadius:8,background:"var(--bg)",border:"1px solid var(--border)"}}>
             <input type="text" placeholder="Group name (e.g. Weekend Warriors)" value={newName} onChange={e=>setNewName(e.target.value)} style={inputStyle}/>
-            <input type="text" placeholder="Members (comma-separated, e.g. Jack, Thea)" value={newMembers} onChange={e=>setNewMembers(e.target.value)} style={{...inputStyle, marginBottom:10}} onKeyDown={e=>e.key==="Enter"&&handleCreate()}/>
+            <input type="text" placeholder="Member names (comma-separated, e.g. Jack, Thea)" value={newMembers} onChange={e=>setNewMembers(e.target.value)} style={inputStyle}/>
+            <input type="tel" placeholder="Phone numbers (comma-separated, e.g. 4025551234, 4025555678)" value={newPhones} onChange={e=>setNewPhones(e.target.value)} style={{...inputStyle, marginBottom:10}} onKeyDown={e=>e.key==="Enter"&&handleCreate()}/>
+            <p style={{fontSize:10,color:"var(--muted)",fontFamily:"var(--ff-mono)",marginBottom:10,marginTop:-6}}>Phone numbers are used to send SMS route shares.</p>
             <div style={{display:"flex",gap:8}}>
               <button onClick={handleCreate} disabled={!newName.trim()} style={{flex:1,padding:"8px",borderRadius:6,border:"none",background:"var(--accent)",color:"#F5EFE0",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"var(--ff-heading)"}}>Create Group</button>
               <button onClick={()=>{setShowCreate(false);setNewName("");setNewMembers("");}} style={{flex:1,padding:"8px",borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--muted)",fontSize:12,cursor:"pointer",fontFamily:"var(--ff-mono)"}}>Cancel</button>
@@ -953,6 +966,7 @@ const StartScreen = ({ user, onLoad, onAuth }) => {
   const [authMode, setAuthMode] = useState("login");
   const [email, setEmail]   = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone]   = useState("");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [status, setStatus] = useState("idle");
@@ -1022,16 +1036,16 @@ const StartScreen = ({ user, onLoad, onAuth }) => {
         : await db.auth.signUp({ email, password });
       if (result.error) { setAuthError(result.error.message); }
       else {
-        onAuth(result.data.user);
-        // Auto-search if we have a saved zip
-        const savedZip = localStorage.getItem("ff_last_zip");
-        if (savedZip) {
-          setZip(savedZip);
-          setTab("find");
-          handleZipSearch(savedZip);
-        } else {
-          setTab("find");
+        const newUser = result.data.user;
+        // Save phone number to user_data on signup
+        if (authMode === "signup" && phone.trim() && newUser) {
+          const cleanPhone = phone.trim().replace(/\D/g, '');
+          await db.from("user_data").upsert({ user_id: newUser.id, phone: cleanPhone, is_premium: false, favorites: [], hidden_ids: [], been_there_ids: [], closed_ids: [], verify_ids: [], manually_kept: [] }, { onConflict: "user_id" });
         }
+        onAuth(newUser);
+        const savedZip = localStorage.getItem("ff_last_zip");
+        if (savedZip) { setZip(savedZip); setTab("find"); handleZipSearch(savedZip); }
+        else { setTab("find"); }
       }
     } catch { setAuthError("Something went wrong. Try again."); }
     setAuthLoading(false);
@@ -1089,6 +1103,12 @@ const StartScreen = ({ user, onLoad, onAuth }) => {
                   <h3 style={{fontFamily:"var(--ff-heading)", fontSize:17, color:"var(--text)", marginBottom:16, textAlign:"center"}}>{authMode==="login" ? "Welcome back" : "Create your account"}</h3>
                   <input type="email" placeholder="Email address" value={email} onChange={e=>setEmail(e.target.value)} style={inputStyle}/>
                   <input type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} style={inputStyle}/>
+                  {authMode === "signup" && (
+                    <>
+                      <input type="tel" placeholder="Phone number (for SMS route sharing)" value={phone} onChange={e=>setPhone(e.target.value)} style={inputStyle}/>
+                      <p style={{fontSize:10,color:"var(--muted)",fontFamily:"var(--ff-mono)",marginBottom:10,marginTop:-6}}>Optional · By providing your phone number, you agree to receive SMS messages from Fade & Find. Message and data rates may apply. We will never sell your information.</p>
+                    </>
+                  )}
                   {authError && <p style={{fontSize:12, color:"#C45A5A", marginBottom:10, fontFamily:"var(--ff-mono)"}}>{authError}</p>}
                   <button onClick={handleAuth} disabled={authLoading} style={{width:"100%", padding:"12px", borderRadius:8, border:"none", background:"var(--accent)", color:"#F5EFE0", fontSize:14, fontWeight:700, cursor:authLoading?"default":"pointer", fontFamily:"var(--ff-heading)", opacity:authLoading?0.7:1, marginBottom:12}}>
                     {authLoading ? "Please wait..." : authMode==="login" ? "Sign In" : "Create Account"}
