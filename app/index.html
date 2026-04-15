@@ -55,9 +55,19 @@ const AuthScreen = ({ onAuth }) => {
         result = await db.auth.signInWithPassword({ email, password });
       } else {
         result = await db.auth.signUp({ email, password });
-        if (!result.error && result.data.user && phone.trim()) {
-          const cleanPhone = phone.trim().replace(/\D/g, '');
-          await db.from("user_data").upsert({ user_id: result.data.user.id, phone: cleanPhone, is_premium: false, favorites: [], hidden_ids: [], been_there_ids: [], closed_ids: [], verify_ids: [], manually_kept: [] }, { onConflict: "user_id" });
+        if (!result.error && result.data.user) {
+          const cleanPhone = phone.trim() ? phone.trim().replace(/\D/g, '') : null;
+          await db.from("user_data").upsert({
+            user_id: result.data.user.id,
+            phone: cleanPhone,
+            is_premium: false,
+            favorites: [],
+            hidden_ids: [],
+            been_there_ids: [],
+            closed_ids: [],
+            verify_ids: [],
+            manually_kept: [],
+          }, { onConflict: "user_id" });
         }
       }
       if (result.error) { setError(result.error.message); }
@@ -1048,10 +1058,19 @@ const StartScreen = ({ user, onLoad, onAuth }) => {
       if (result.error) { setAuthError(result.error.message); }
       else {
         const newUser = result.data.user;
-        // Save phone number to user_data on signup
-        if (authMode === "signup" && phone.trim() && newUser) {
-          const cleanPhone = phone.trim().replace(/\D/g, '');
-          await db.from("user_data").upsert({ user_id: newUser.id, phone: cleanPhone, is_premium: false, favorites: [], hidden_ids: [], been_there_ids: [], closed_ids: [], verify_ids: [], manually_kept: [] }, { onConflict: "user_id" });
+        if (authMode === "signup" && newUser) {
+          const cleanPhone = phone.trim() ? phone.trim().replace(/\D/g, '') : null;
+          await db.from("user_data").upsert({
+            user_id: newUser.id,
+            phone: cleanPhone,
+            is_premium: false,
+            favorites: [],
+            hidden_ids: [],
+            been_there_ids: [],
+            closed_ids: [],
+            verify_ids: [],
+            manually_kept: [],
+          }, { onConflict: "user_id" });
         }
         onAuth(newUser);
         const savedZip = localStorage.getItem("ff_last_zip");
