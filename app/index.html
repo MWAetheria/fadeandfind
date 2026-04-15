@@ -1007,17 +1007,24 @@ const AppraiserModal = ({ user, isPremium, appraiserUses, setAppraiserUses, onCl
   }, []);
 
   const handleImageSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setImage(ev.target.result);
-      setImageData(ev.target.result.split(",")[1]);
-      setResult(null);
-      setError("");
-    };
-    reader.readAsDataURL(file);
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const canvas = document.createElement('canvas');
+  const img = new Image();
+  img.onload = () => {
+    const maxWidth = 1024;
+    const scale = Math.min(maxWidth / img.width, 1);
+    canvas.width = img.width * scale;
+    canvas.height = img.height * scale;
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    const compressed = canvas.toDataURL('image/jpeg', 0.7);
+    setImage(compressed);
+    setImageData(compressed.split(",")[1]);
+    setResult(null);
+    setError("");
   };
+  img.src = URL.createObjectURL(file);
+};
 
   const handleAppraise = async () => {
     if (!imageData) return;
