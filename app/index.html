@@ -549,7 +549,9 @@ const ListingCard = ({ listing, isSelected, isFavorite, isRouteStop, routeIndex,
 };
 
 // ── Filter Panel ──────────────────────────────────────
-const FilterPanel = ({ filters, setFilters, onClose, flaggedListings, onUnflag }) => (
+const FilterPanel = ({ filters, setFilters, onClose, flaggedListings, onUnflag }) => {
+  const [showFlagged, setShowFlagged] = React.useState(false);
+  return (
   <div style={{position:"absolute",top:0,left:0,right:0,bottom:0,zIndex:100,background:"var(--bg)",padding:20,overflow:"auto",animation:"slideUp 0.3s ease"}}>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
       <h3 style={{fontFamily:"var(--ff-heading)",fontSize:20,color:"var(--text)",margin:0}}>Filters</h3>
@@ -588,10 +590,16 @@ const FilterPanel = ({ filters, setFilters, onClose, flaggedListings, onUnflag }
     </div>
     {flaggedListings && flaggedListings.length > 0 && (
       <div style={{marginTop:8,paddingTop:20,borderTop:"1px solid var(--border)"}}>
-        <label style={{fontSize:11,fontFamily:"var(--ff-mono)",color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.1em",display:"block",marginBottom:8}}>
-          🚩 Auto-Filtered ({flaggedListings.length}) · Tap Keep to restore
-        </label>
-        {flaggedListings.map(l=>(
+        <div
+          onClick={()=>setShowFlagged(f=>!f)}
+          style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",marginBottom:showFlagged?12:0}}
+        >
+          <label style={{fontSize:11,fontFamily:"var(--ff-mono)",color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.1em",cursor:"pointer"}}>
+            🚩 Auto-Filtered ({flaggedListings.length}) · Tap to {showFlagged?"hide":"show"}
+          </label>
+          <span style={{fontSize:12,color:"var(--muted)"}}>{showFlagged?"▲":"▼"}</span>
+        </div>
+        {showFlagged && flaggedListings.map(l=>(
           <div key={l.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,marginBottom:6,background:"var(--card-bg)",border:"1px dashed var(--border)"}}>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:12,fontWeight:600,color:"var(--muted)",fontFamily:"var(--ff-mono)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{l.name}</div>
@@ -606,7 +614,8 @@ const FilterPanel = ({ filters, setFilters, onClose, flaggedListings, onUnflag }
       </div>
     )}
   </div>
-);
+  );
+};
 
 // ── Route optimization (nearest-neighbor) ────────────
 function optimizeRoute(listings) {
@@ -1144,11 +1153,11 @@ function FadeAndFind() {
 
   // ── Check existing session on mount ──
   useEffect(() => {
-    // Handle post-checkout redirect
-if (window.location.search.includes("upgraded=true")) {
-  window.history.replaceState({}, "", window.location.pathname);
-  setTimeout(() => setIsPremium(true), 500);
-}
+    // Handle post-Stripe-checkout redirect
+    if (window.location.search.includes("upgraded=true")) {
+      window.history.replaceState({}, "", window.location.pathname);
+      setTimeout(() => setIsPremium(true), 500);
+    }
     db.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null;
       _currentUser = u;
@@ -1378,7 +1387,7 @@ if (window.location.search.includes("upgraded=true")) {
             </p>
           </div>
           <div style={{display:"flex",gap:6,alignItems:"center"}}>
-            <div style={{width:36,height:36,borderRadius:8,background:"var(--card-bg)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,cursor:"pointer"}}>🔔</div>
+            <div onClick={()=>setActiveTab("alerts")} style={{width:36,height:36,borderRadius:8,background:"var(--card-bg)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,cursor:"pointer"}}>🔔</div>
             {!user ? (
               <button onClick={()=>setShowAuthModal(true)} style={{height:36,padding:"0 12px",borderRadius:18,background:"var(--accent)",border:"none",color:"#F5EFE0",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"var(--ff-mono)",whiteSpace:"nowrap"}}>Sign In</button>
             ) : (
