@@ -1144,6 +1144,11 @@ function FadeAndFind() {
 
   // ── Check existing session on mount ──
   useEffect(() => {
+    // Handle post-checkout redirect
+if (window.location.search.includes("upgraded=true")) {
+  window.history.replaceState({}, "", window.location.pathname);
+  setTimeout(() => setIsPremium(true), 500);
+}
     db.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null;
       _currentUser = u;
