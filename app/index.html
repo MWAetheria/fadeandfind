@@ -1196,7 +1196,6 @@ function FadeAndFind() {
   const [mapBounds, setMapBounds] = useState(null);
   const [manuallyKept, setManuallyKept] = useState(new Set());
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [openNow, setOpenNow] = useState(false);
   const [closedIds,    setClosedIds]    = useState(new Set());
   const [verifyIds,    setVerifyIds]    = useState(new Set());
   const [beenThereIds, setBeenThereIds] = useState(new Set());
@@ -1370,18 +1369,6 @@ function FadeAndFind() {
     .filter(l => l.distance <= filters.maxDistance)
     .filter(l => !filters.featuredOnly || l.featured)
     .filter(l => {
-      if (!openNow) return true;
-      // Google Places listings: status field contains "Open Now"
-      if (l.source === "google_places") return l.status === "Open Now";
-      // Estate sales: check if today falls within their dates
-      if (l.dates) {
-        const today = new Date();
-        const todayStr = today.toLocaleDateString("en-US", { month:"short", day:"numeric" });
-        return l.dates.includes(todayStr) || l.status === "Going on Now!" || l.status === "Ends Today!";
-      }
-      return true; // don't filter out listings with no date info
-    })
-    .filter(l => {
       if (!filters.tagSearch) return true;
       const terms = filters.tagSearch.toLowerCase().split(",").map(t=>t.trim());
       return terms.some(t => l.tags.some(tag=>tag.includes(t)) || l.name.toLowerCase().includes(t));
@@ -1496,18 +1483,6 @@ function FadeAndFind() {
                 )}
               </div>
               <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                <button
-                  onClick={()=>setOpenNow(o=>!o)}
-                  style={{
-                    fontSize:11, fontFamily:"var(--ff-mono)", cursor:"pointer",
-                    padding:"3px 10px", borderRadius:100,
-                    border: openNow ? "1px solid #3A7A3A" : "1px solid var(--border)",
-                    background: openNow ? "#C4E8C4" : "var(--card-bg)",
-                    color: openNow ? "#3A7A3A" : "var(--muted)",
-                    fontWeight: openNow ? 700 : 400,
-                    transition: "all 0.2s",
-                  }}
-                >🟢 Open Now</button>
                 {filters.maxDistance<200 && <span style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"var(--accent)",background:"var(--accent-bg)",padding:"2px 8px",borderRadius:4}}>within {filters.maxDistance}mi</span>}
               </div>
             </div>
