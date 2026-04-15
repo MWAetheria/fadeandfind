@@ -43,6 +43,7 @@ const AuthScreen = ({ onAuth }) => {
   const [mode, setMode]       = useState("login"); // login | signup
   const [email, setEmail]     = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone]     = useState("");
   const [error, setError]     = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -54,6 +55,10 @@ const AuthScreen = ({ onAuth }) => {
         result = await db.auth.signInWithPassword({ email, password });
       } else {
         result = await db.auth.signUp({ email, password });
+        if (!result.error && result.data.user && phone.trim()) {
+          const cleanPhone = phone.trim().replace(/\D/g, '');
+          await db.from("user_data").upsert({ user_id: result.data.user.id, phone: cleanPhone, is_premium: false, favorites: [], hidden_ids: [], been_there_ids: [], closed_ids: [], verify_ids: [], manually_kept: [] }, { onConflict: "user_id" });
+        }
       }
       if (result.error) { setError(result.error.message); }
       else { onAuth(result.data.user); }
@@ -77,6 +82,12 @@ const AuthScreen = ({ onAuth }) => {
         </h3>
         <input type="email" placeholder="Email address" value={email} onChange={e=>setEmail(e.target.value)} style={inputStyle}/>
         <input type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleSubmit()} style={inputStyle}/>
+        {mode === "signup" && (
+          <>
+            <input type="tel" placeholder="Phone number (optional)" value={phone} onChange={e=>setPhone(e.target.value)} style={inputStyle}/>
+            <p style={{fontSize:10,color:"var(--muted)",fontFamily:"var(--ff-mono)",marginBottom:12,marginTop:-8}}>By providing your phone number, you agree to receive SMS messages from Fade & Find. Message and data rates may apply. We will never sell your information.</p>
+          </>
+        )}
         {error && <p style={{fontSize:12,color:"#C86A6A",marginBottom:12,fontFamily:"var(--ff-mono)"}}>{error}</p>}
         <button onClick={handleSubmit} disabled={loading} style={{width:"100%",padding:"12px",borderRadius:8,border:"none",background:"var(--accent)",color:"var(--bg)",fontSize:14,fontWeight:700,cursor:loading?"default":"pointer",fontFamily:"var(--ff-heading)",opacity:loading?0.7:1}}>
           {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
