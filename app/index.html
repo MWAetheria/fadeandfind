@@ -1170,14 +1170,14 @@ const AppraiserModal = ({ user, isPremium, appraiserUses, setAppraiserUses, onCl
               {showHistory ? "▲ Hide" : "▼ Show"} History ({history.length})
             </button>
             {showHistory && history.map((h,i)=>(
-              <div key={h.id || i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:8,background:"var(--card-bg)",border:"1px solid var(--border)",marginBottom:6}}>
-                <div style={{flex:1,minWidth:0}}>
-                  <p style={{fontSize:13,fontWeight:600,color:"var(--text)",fontFamily:"var(--ff-heading)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{h.result?.item || "Unknown item"}</p>
-                  <p style={{fontSize:11,color:"var(--accent)",fontFamily:"var(--ff-mono)"}}>${h.result?.value_low}–${h.result?.value_high}</p>
-                  <p style={{fontSize:10,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>{new Date(h.created_at).toLocaleDateString()}</p>
-                </div>
-                <button onClick={()=>handleDelete(h.id)} style={{width:24,height:24,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--muted)",fontSize:11,cursor:"pointer",flexShrink:0}}>✕</button>
-              </div>
+              <div key={h.id || i} onClick={()=>{setResult(h.result);setImage(null);setShowHistory(false);}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:8,background:"var(--card-bg)",border:"1px solid var(--border)",marginBottom:6,cursor:"pointer"}}>
+  <div style={{flex:1,minWidth:0}}>
+    <p style={{fontSize:13,fontWeight:600,color:"var(--text)",fontFamily:"var(--ff-heading)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{h.result?.item || "Unknown item"}</p>
+    <p style={{fontSize:11,color:"var(--accent)",fontFamily:"var(--ff-mono)"}}>${h.result?.value_low}–${h.result?.value_high}</p>
+    <p style={{fontSize:10,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>{new Date(h.created_at).toLocaleDateString()}</p>
+  </div>
+  <button onClick={(e)=>{e.stopPropagation();handleDelete(h.id);}} style={{width:24,height:24,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--muted)",fontSize:11,cursor:"pointer",flexShrink:0}}>✕</button>
+</div>
             ))}
           </div>
         )}
