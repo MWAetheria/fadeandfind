@@ -1025,50 +1025,17 @@ const AppraiserModal = ({ user, isPremium, appraiserUses, setAppraiserUses, onCl
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch("/api/appraise", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{
-            role: "user",
-            content: [
-              {
-                type: "image",
-                source: { type: "base64", media_type: "image/jpeg", data: imageData }
-              },
-              {
-                type: "text",
-                text: `You are an expert antique appraiser and estate sale specialist. Analyze this item and provide:
-1. Item identification (what it is, maker/brand if visible)
-2. Estimated era/age
-3. Style or category (e.g. Mid-Century Modern, Victorian, Art Deco)
-4. Condition assessment based on what's visible
-5. Estimated market value range (low to high in USD)
-6. Where to sell it for the best price (e.g. eBay, local auction, specialty dealer, etc.)
-7. Any notable features that affect value
-
-Respond ONLY with a JSON object, no markdown, no preamble:
-{
-  "item": "string",
-  "era": "string", 
-  "style": "string",
-  "condition": "string",
-  "value_low": number,
-  "value_high": number,
-  "best_to_sell": ["string"],
-  "notes": "string"
-}`
-              }
-            ]
-          }]
-        })
+        body: JSON.stringify({ imageData, mediaType: "image/jpeg" }),
       });
-      const data = await response.json();
-      const text = data.content?.[0]?.text || "";
-      const clean = text.replace(/```json|```/g, "").trim();
-      const parsed = JSON.parse(clean);
+      const parsed = await response.json();
+      if (!response.ok || parsed.error) {
+        setError("Couldn't analyze this image. Please try again with a clearer photo.");
+        setLoading(false);
+        return;
+      }
       setResult(parsed);
 
       // Save to appraisals table
