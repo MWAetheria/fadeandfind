@@ -1256,7 +1256,7 @@ const StartScreen = ({ user, onLoad, onAuth }) => {
     if (!searchZip.trim()) return;
     setStatus("locating"); setLocError("");
     try {
-      const resp = await fetch(`https://nominatim.openstreetmap.org/search?q=${searchZip}&format=json&limit=1`, { headers: { "User-Agent": "FadeAndFind/1.0" } });
+      const resp = await fetch(`https://nominatim.openstreetmap.org/search?q=${searchZip}&format=json&limit=1&countrycodes=us`, { headers: { "User-Agent": "FadeAndFind/1.0" } });
       const results = await resp.json();
       if (!results.length) throw new Error("Location not found");
       try { localStorage.setItem("ff_last_zip", searchZip); } catch {}
@@ -1448,7 +1448,7 @@ function FadeAndFind() {
 
   const autoLoadZip = async (zip, radius) => {
     try {
-      const resp = await fetch(`https://nominatim.openstreetmap.org/search?q=${zip}&format=json&limit=1`, { headers: { "User-Agent": "FadeAndFind/1.0" } });
+      const resp = await fetch(`https://nominatim.openstreetmap.org/search?q=${searchZip}&format=json&limit=1&countrycodes=us`, { headers: { "User-Agent": "FadeAndFind/1.0" } });
       const results = await resp.json();
       if (!results.length) return;
       const lat = parseFloat(results[0].lat);
