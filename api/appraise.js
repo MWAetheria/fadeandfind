@@ -1,3 +1,11 @@
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
+};
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "https://www.fadeandfind.com");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -19,7 +27,7 @@ export default async function handler(req, res) {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-opus-4-6",
+        model: "claude-sonnet-4-5",
         max_tokens: 1000,
         messages: [{
           role: "user",
