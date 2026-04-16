@@ -1,1084 +1,1743 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Fade & Find — Where Forgotten Things Find New Homes</title>
-  <meta name="description" content="Discover estate sales, antique stores, auctions, and flea markets near you. Plan your route, save favorites, and hunt smarter."/>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fade & Find</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Source+Sans+3:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg:        #F5EFE0;
-      --card:      #EDE5D0;
-      --text:      #2C1810;
-      --muted:     #8A7A65;
-      --accent:    #C4922A;
-      --accent2:   #8B4513;
-      --border:    #D4C4A8;
-      --cream:     #FAF6EE;
-      --ff-head:   'Playfair Display', Georgia, serif;
-      --ff-body:   'DM Sans', system-ui, sans-serif;
-      --ff-mono:   'DM Mono', monospace;
-    }
-
-    html { scroll-behavior: smooth; }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--ff-body);
-      font-weight: 400;
-      line-height: 1.6;
-      overflow-x: hidden;
-    }
-
-    /* ── Texture overlay ── */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
-      pointer-events: none;
-      z-index: 0;
-      opacity: 0.6;
-    }
-
-    /* ── Nav ── */
-    nav {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 16px 40px;
-      background: rgba(245,239,224,0.85);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .nav-logo {
-      font-family: var(--ff-head);
-      font-size: 22px;
-      font-weight: 900;
-      background: linear-gradient(135deg, #2C1810 0%, #C4922A 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      text-decoration: none;
-    }
-
-    .nav-links {
-      display: flex;
-      align-items: center;
-      gap: 32px;
-      list-style: none;
-    }
-
-    .nav-links a {
-      font-size: 14px;
-      color: var(--muted);
-      text-decoration: none;
-      font-weight: 500;
-      transition: color 0.2s;
-    }
-
-    .nav-links a:hover { color: var(--text); }
-
-    .btn-nav {
-      padding: 9px 22px;
-      border-radius: 100px;
-      background: var(--accent);
-      color: #FAF6EE;
-      font-size: 14px;
-      font-weight: 500;
-      text-decoration: none;
-      transition: opacity 0.2s, transform 0.2s;
-    }
-
-    .btn-nav:hover { opacity: 0.88; transform: translateY(-1px); }
-
-    /* ── Hero ── */
-    .hero {
-      position: relative;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 120px 24px 80px;
-      overflow: hidden;
-    }
-
-    .hero-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 16px;
-      border-radius: 100px;
-      border: 1px solid var(--border);
-      background: var(--card);
-      font-size: 12px;
-      font-family: var(--ff-mono);
-      color: var(--muted);
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      margin-bottom: 32px;
-      animation: fadeUp 0.6s ease both;
-    }
-
-    .hero-badge span { color: var(--accent); }
-
-    .hero h1 {
-      font-family: var(--ff-head);
-      font-size: clamp(48px, 8vw, 96px);
-      font-weight: 900;
-      line-height: 1.0;
-      letter-spacing: -0.02em;
-      margin-bottom: 8px;
-      animation: fadeUp 0.6s 0.1s ease both;
-    }
-
-    .hero h1 em {
-      font-style: italic;
-      background: linear-gradient(135deg, #C4922A 0%, #8B4513 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .hero-sub {
-      font-family: var(--ff-head);
-      font-size: clamp(18px, 3vw, 26px);
-      font-weight: 400;
-      font-style: italic;
-      color: var(--muted);
-      margin-bottom: 40px;
-      animation: fadeUp 0.6s 0.2s ease both;
-    }
-
-    .hero-desc {
-      font-size: 17px;
-      color: var(--muted);
-      max-width: 520px;
-      margin: 0 auto 48px;
-      line-height: 1.7;
-      animation: fadeUp 0.6s 0.3s ease both;
-    }
-
-    .hero-ctas {
-      display: flex;
-      gap: 14px;
-      justify-content: center;
-      flex-wrap: wrap;
-      animation: fadeUp 0.6s 0.4s ease both;
-    }
-
-    .btn-primary {
-      padding: 16px 36px;
-      border-radius: 100px;
-      background: var(--accent);
-      color: #FAF6EE;
-      font-size: 16px;
-      font-weight: 500;
-      text-decoration: none;
-      transition: all 0.2s;
-      box-shadow: 0 4px 20px rgba(196,146,42,0.3);
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 28px rgba(196,146,42,0.4);
-    }
-
-    .btn-secondary {
-      padding: 16px 36px;
-      border-radius: 100px;
-      border: 1.5px solid var(--border);
-      background: transparent;
-      color: var(--text);
-      font-size: 16px;
-      font-weight: 500;
-      text-decoration: none;
-      transition: all 0.2s;
-    }
-
-    .btn-secondary:hover {
-      background: var(--card);
-      border-color: var(--accent);
-      transform: translateY(-2px);
-    }
-
-    /* Decorative map pins */
-    .hero-pins {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      overflow: hidden;
-    }
-
-    .pin {
-      position: absolute;
-      width: 44px;
-      height: 44px;
-      border-radius: 50% 50% 50% 0;
-      transform: rotate(-45deg);
-      opacity: 0.12;
-      animation: float 6s ease-in-out infinite;
-    }
-
-    .pin:nth-child(1) { background: var(--accent); top: 15%; left: 8%; animation-delay: 0s; }
-    .pin:nth-child(2) { background: #8B4513; top: 25%; right: 10%; width: 32px; height: 32px; animation-delay: 1.5s; }
-    .pin:nth-child(3) { background: var(--accent); bottom: 30%; left: 12%; width: 24px; height: 24px; animation-delay: 3s; }
-    .pin:nth-child(4) { background: #8B4513; bottom: 20%; right: 8%; animation-delay: 0.8s; }
-    .pin:nth-child(5) { background: var(--accent); top: 60%; left: 5%; width: 20px; height: 20px; animation-delay: 2s; }
-
-    .hero-scroll {
-      position: absolute;
-      bottom: 32px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      font-size: 11px;
-      font-family: var(--ff-mono);
-      color: var(--muted);
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      animation: fadeUp 0.6s 0.8s ease both;
-    }
-
-    .scroll-line {
-      width: 1px;
-      height: 40px;
-      background: linear-gradient(to bottom, var(--muted), transparent);
-      animation: scrollPulse 2s ease-in-out infinite;
-    }
-
-    /* ── Stats bar ── */
-    .stats {
-      position: relative;
-      z-index: 1;
-      background: var(--card);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-      padding: 32px 40px;
-      display: flex;
-      justify-content: center;
-      gap: 80px;
-      flex-wrap: wrap;
-    }
-
-    .stat {
-      text-align: center;
-    }
-
-    .stat-num {
-      font-family: var(--ff-head);
-      font-size: 36px;
-      font-weight: 900;
-      color: var(--accent);
-      line-height: 1;
-    }
-
-    .stat-label {
-      font-size: 13px;
-      color: var(--muted);
-      font-family: var(--ff-mono);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-top: 4px;
-    }
-
-    /* ── Sections ── */
-    section {
-      position: relative;
-      z-index: 1;
-      padding: 100px 24px;
-      max-width: 1100px;
-      margin: 0 auto;
-    }
-
-    .section-label {
-      font-family: var(--ff-mono);
-      font-size: 11px;
-      color: var(--accent);
-      text-transform: uppercase;
-      letter-spacing: 0.15em;
-      margin-bottom: 16px;
-      display: block;
-    }
-
-    .section-title {
-      font-family: var(--ff-head);
-      font-size: clamp(32px, 5vw, 52px);
-      font-weight: 900;
-      line-height: 1.1;
-      letter-spacing: -0.01em;
-      margin-bottom: 16px;
-    }
-
-    .section-title em {
-      font-style: italic;
-      color: var(--accent);
-    }
-
-    .section-desc {
-      font-size: 17px;
-      color: var(--muted);
-      max-width: 560px;
-      line-height: 1.7;
-      margin-bottom: 64px;
-    }
-
-    /* ── How it works ── */
-    .steps {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 24px;
-    }
-
-    .step {
-      padding: 36px 32px;
-      background: var(--card);
-      border-radius: 16px;
-      border: 1px solid var(--border);
-      position: relative;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-
-    .step:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 12px 40px rgba(44,24,16,0.08);
-    }
-
-    .step-num {
-      font-family: var(--ff-head);
-      font-size: 64px;
-      font-weight: 900;
-      color: var(--border);
-      line-height: 1;
-      margin-bottom: 16px;
-    }
-
-    .step h3 {
-      font-family: var(--ff-head);
-      font-size: 22px;
-      font-weight: 700;
-      margin-bottom: 12px;
-    }
-
-    .step p {
-      font-size: 15px;
-      color: var(--muted);
-      line-height: 1.6;
-    }
-
-    /* ── Features ── */
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 20px;
-    }
-
-    .feature {
-      padding: 28px;
-      background: var(--card);
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      display: flex;
-      gap: 16px;
-      align-items: flex-start;
-      transition: transform 0.2s;
-    }
-
-    .feature:hover { transform: translateY(-3px); }
-
-    .feature-icon {
-      width: 44px;
-      height: 44px;
-      border-radius: 10px;
-      background: linear-gradient(135deg, #C4922A22, #C4922A44);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 22px;
-      flex-shrink: 0;
-    }
-
-    .feature h4 {
-      font-family: var(--ff-head);
-      font-size: 17px;
-      font-weight: 700;
-      margin-bottom: 6px;
-    }
-
-    .feature p {
-      font-size: 14px;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-
-    /* ── Pricing ── */
-    .pricing-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 24px;
-      max-width: 780px;
-      margin: 0 auto;
-    }
-
-    .pricing-card {
-      padding: 40px 36px;
-      border-radius: 20px;
-      border: 1.5px solid var(--border);
-      background: var(--card);
-      position: relative;
-      transition: transform 0.2s;
-    }
-
-    .pricing-card:hover { transform: translateY(-4px); }
-
-    .pricing-card.featured {
-      border-color: var(--accent);
-      background: linear-gradient(145deg, #EDE5D0, #E8DBC8);
-      box-shadow: 0 8px 40px rgba(196,146,42,0.15);
-    }
-
-    .pricing-badge {
-      position: absolute;
-      top: -14px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--accent);
-      color: #FAF6EE;
-      font-size: 11px;
-      font-family: var(--ff-mono);
-      font-weight: 500;
-      padding: 4px 14px;
-      border-radius: 100px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      white-space: nowrap;
-    }
-
-    .pricing-tier {
-      font-family: var(--ff-mono);
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--muted);
-      margin-bottom: 12px;
-    }
-
-    .pricing-price {
-      font-family: var(--ff-head);
-      font-size: 52px;
-      font-weight: 900;
-      line-height: 1;
-      margin-bottom: 4px;
-    }
-
-    .pricing-price sup {
-      font-size: 24px;
-      vertical-align: top;
-      margin-top: 10px;
-    }
-
-    .pricing-cadence {
-      font-size: 13px;
-      color: var(--muted);
-      margin-bottom: 32px;
-    }
-
-    .pricing-features {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-bottom: 36px;
-    }
-
-    .pricing-features li {
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .pricing-features li::before {
-      content: '✓';
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: var(--accent);
-      color: #FAF6EE;
-      font-size: 11px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      font-weight: 700;
-    }
-
-    .pricing-features li.locked {
-      color: var(--muted);
-    }
-
-    .pricing-features li.locked::before {
-      content: '—';
-      background: var(--border);
-      color: var(--muted);
-    }
-
-    .btn-pricing {
-      display: block;
-      width: 100%;
-      padding: 14px;
-      border-radius: 100px;
-      text-align: center;
-      font-size: 15px;
-      font-weight: 500;
-      text-decoration: none;
-      transition: all 0.2s;
-    }
-
-    .btn-pricing-free {
-      border: 1.5px solid var(--border);
-      color: var(--text);
-    }
-
-    .btn-pricing-free:hover {
-      border-color: var(--accent);
-      background: var(--bg);
-    }
-
-    .btn-pricing-paid {
-      background: var(--accent);
-      color: #FAF6EE;
-      box-shadow: 0 4px 16px rgba(196,146,42,0.25);
-    }
-
-    .btn-pricing-paid:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(196,146,42,0.35);
-    }
-
-    /* ── Coming soon feature ── */
-    .appraiser {
-      position: relative;
-      z-index: 1;
-      margin: 0 auto;
-      max-width: 1100px;
-      padding: 0 24px 100px;
-    }
-
-    .appraiser-card {
-      background: linear-gradient(135deg, #2C1810 0%, #4A2C1A 100%);
-      border-radius: 24px;
-      padding: 64px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 48px;
-      align-items: center;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .appraiser-card::before {
-      content: '';
-      position: absolute;
-      top: -60px; right: -60px;
-      width: 300px; height: 300px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(196,146,42,0.2), transparent 70%);
-    }
-
-    .appraiser-label {
-      font-family: var(--ff-mono);
-      font-size: 11px;
-      color: var(--accent);
-      text-transform: uppercase;
-      letter-spacing: 0.15em;
-      margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .appraiser-label::before {
-      content: '';
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--accent);
-      animation: pulse 2s ease-in-out infinite;
-    }
-
-    .appraiser h2 {
-      font-family: var(--ff-head);
-      font-size: clamp(28px, 4vw, 44px);
-      font-weight: 900;
-      color: #FAF6EE;
-      line-height: 1.1;
-      margin-bottom: 20px;
-    }
-
-    .appraiser h2 em {
-      font-style: italic;
-      color: var(--accent);
-    }
-
-    .appraiser p {
-      font-size: 16px;
-      color: rgba(250,246,238,0.7);
-      line-height: 1.7;
-    }
-
-    .appraiser-demo {
-      background: rgba(250,246,238,0.06);
-      border: 1px solid rgba(250,246,238,0.12);
-      border-radius: 16px;
-      padding: 28px;
-    }
-
-    .appraiser-demo-item {
-      display: flex;
-      gap: 12px;
-      align-items: flex-start;
-      margin-bottom: 16px;
-    }
-
-    .appraiser-demo-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      background: rgba(196,146,42,0.2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      flex-shrink: 0;
-    }
-
-    .appraiser-demo-text h5 {
-      font-size: 13px;
-      font-weight: 500;
-      color: #FAF6EE;
-      margin-bottom: 3px;
-    }
-
-    .appraiser-demo-text p {
-      font-size: 12px;
-      color: rgba(250,246,238,0.5);
-      line-height: 1.4;
-    }
-
-    /* ── CTA Section ── */
-    .cta-section {
-      position: relative;
-      z-index: 1;
-      text-align: center;
-      padding: 100px 24px;
-      background: var(--card);
-      border-top: 1px solid var(--border);
-    }
-
-    .cta-section h2 {
-      font-family: var(--ff-head);
-      font-size: clamp(32px, 5vw, 56px);
-      font-weight: 900;
-      line-height: 1.1;
-      margin-bottom: 16px;
-    }
-
-    .cta-section h2 em {
-      font-style: italic;
-      color: var(--accent);
-    }
-
-    .cta-section p {
-      font-size: 17px;
-      color: var(--muted);
-      margin-bottom: 40px;
-      max-width: 480px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    /* ── Footer ── */
-    footer {
-      position: relative;
-      z-index: 1;
-      background: #2C1810;
-      color: rgba(250,246,238,0.6);
-      padding: 48px 40px 32px;
-    }
-
-    .footer-inner {
-      max-width: 1100px;
-      margin: 0 auto;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 40px;
-      flex-wrap: wrap;
-      margin-bottom: 40px;
-    }
-
-    .footer-brand .logo {
-      font-family: var(--ff-head);
-      font-size: 24px;
-      font-weight: 900;
-      color: #FAF6EE;
-      margin-bottom: 8px;
-    }
-
-    .footer-brand p {
-      font-size: 13px;
-      font-style: italic;
-      color: rgba(250,246,238,0.5);
-    }
-
-    .footer-links {
-      display: flex;
-      gap: 24px;
-      flex-wrap: wrap;
-    }
-
-    .footer-links a {
-      font-size: 13px;
-      color: rgba(250,246,238,0.5);
-      text-decoration: none;
-      transition: color 0.2s;
-      font-family: var(--ff-mono);
-    }
-
-    .footer-links a:hover { color: var(--accent); }
-
-    .footer-bottom {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding-top: 24px;
-      border-top: 1px solid rgba(250,246,238,0.1);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 12px;
-      font-family: var(--ff-mono);
-      color: rgba(250,246,238,0.3);
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    /* ── Animations ── */
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(24px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    @keyframes float {
-      0%, 100% { transform: rotate(-45deg) translateY(0); }
-      50%       { transform: rotate(-45deg) translateY(-12px); }
-    }
-
-    @keyframes scrollPulse {
-      0%, 100% { opacity: 0.4; transform: scaleY(1); }
-      50%       { opacity: 1;   transform: scaleY(1.2); }
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 0.6; transform: scale(1); }
-      50%       { opacity: 1;   transform: scale(1.3); }
-    }
-
-    /* ── Responsive ── */
-    @media (max-width: 768px) {
-      nav { padding: 14px 20px; }
-      .nav-links { display: none; }
-      .stats { gap: 40px; padding: 28px 20px; }
-      section { padding: 64px 20px; }
-      .appraiser-card { grid-template-columns: 1fr; padding: 36px 28px; }
-      .appraiser-card::before { display: none; }
-      .footer-inner { flex-direction: column; gap: 24px; }
-      .footer-bottom { flex-direction: column; text-align: center; }
-    }
-
-    /* ── Divider ── */
-    .divider {
-      position: relative;
-      z-index: 1;
-      width: 100%;
-      height: 1px;
-      background: var(--border);
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #F5EFE0; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #C4B49A; border-radius: 3px; }
+    input::placeholder { color: #A8967E; }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes pulse { 0%,100% { opacity:.6 } 50% { opacity:1 } }
   </style>
 </head>
 <body>
+<div id="root"></div>
 
-  <!-- NAV -->
-  <nav>
-    <a href="/" class="nav-logo">Fade & Find</a>
-    <ul class="nav-links">
-      <li><a href="#how-it-works">How it works</a></li>
-      <li><a href="#features">Features</a></li>
-      <li><a href="#pricing">Pricing</a></li>
-      <li><a href="/app" class="btn-nav">Open App →</a></li>
-    </ul>
-  </nav>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-  <!-- HERO -->
-  <div class="hero">
-    <div class="hero-pins">
-      <div class="pin"></div>
-      <div class="pin"></div>
-      <div class="pin"></div>
-      <div class="pin"></div>
-      <div class="pin"></div>
-    </div>
+// ── Supabase client ───────────────────────────────────
+const SUPA_URL = "https://dmriqhvmsfxujwiizigg.supabase.co";
+const SUPA_KEY = "sb_publishable_wpboEhLjq2kpfnTkS90nhA_2guN8FZr";
+const db = supabase.createClient(SUPA_URL, SUPA_KEY);
 
-    <div class="hero-badge">🗺️ Now live — <span>estate sales, antiques & auctions near you</span></div>
+// Module-level user cache — survives Edge tracking prevention blocking storage
+let _currentUser = null;
 
-    <h1>The <em>Saturday morning</em><br/>treasure hunt, upgraded.</h1>
-    <p class="hero-sub">Where forgotten things find new homes.</p>
-    <p class="hero-desc">Fade & Find puts every estate sale, antique store, flea market, and auction in your area on one beautiful map — then helps you plan the perfect route.</p>
+// ── Auth Screen ───────────────────────────────────────
+const AuthScreen = ({ onAuth }) => {
+  const [mode, setMode]       = useState("login"); // login | signup
+  const [email, setEmail]     = useState("");
+  const [password, setPassword] = useState("");
+  const [phone, setPhone]     = useState("");
+  const [error, setError]     = useState("");
+  const [loading, setLoading] = useState(false);
 
-    <div class="hero-ctas">
-      <a href="/app" class="btn-primary">Start Hunting Free →</a>
-      <a href="#how-it-works" class="btn-secondary">See how it works</a>
-    </div>
+  const handleSubmit = async () => {
+    setError(""); setLoading(true);
+    try {
+      let result;
+      if (mode === "login") {
+        result = await db.auth.signInWithPassword({ email, password });
+      } else {
+        result = await db.auth.signUp({ email, password });
+        if (!result.error && result.data.user) {
+          const cleanPhone = phone.trim() ? phone.trim().replace(/\D/g, '') : null;
+          await db.from("user_data").upsert({
+            user_id: result.data.user.id,
+            phone: cleanPhone,
+            is_premium: false,
+            favorites: [],
+            hidden_ids: [],
+            been_there_ids: [],
+            closed_ids: [],
+            verify_ids: [],
+            manually_kept: [],
+          }, { onConflict: "user_id" });
+        }
+      }
+      if (result.error) { setError(result.error.message); }
+      else { onAuth(result.data.user); }
+    } catch (e) { setError("Something went wrong. Please try again."); }
+    setLoading(false);
+  };
 
-    <div class="hero-scroll">
-      <div class="scroll-line"></div>
-      Scroll
-    </div>
-  </div>
+  const inputStyle = {
+    width:"100%", padding:"10px 14px", borderRadius:8, border:"1px solid var(--border)",
+    background:"var(--card-bg)", color:"var(--text)", fontSize:14, outline:"none",
+    fontFamily:"var(--ff-body)", marginBottom:12,
+  };
 
-  <!-- STATS -->
-  <div class="stats">
-    <div class="stat">
-      <div class="stat-num">5+</div>
-      <div class="stat-label">Venue Types</div>
-    </div>
-    <div class="stat">
-      <div class="stat-num">Free</div>
-      <div class="stat-label">To Get Started</div>
-    </div>
-    <div class="stat">
-      <div class="stat-num">1-tap</div>
-      <div class="stat-label">Route Planning</div>
-    </div>
-    <div class="stat">
-      <div class="stat-num">Live</div>
-      <div class="stat-label">Listing Data</div>
-    </div>
-  </div>
-
-  <!-- HOW IT WORKS -->
-  <section id="how-it-works">
-    <span class="section-label">How it works</span>
-    <h2 class="section-title">Three steps to your<br/><em>best Saturday ever.</em></h2>
-    <p class="section-desc">No more bouncing between apps or scribbling addresses on scraps of paper. Fade & Find brings it all together.</p>
-
-    <div class="steps">
-      <div class="step">
-        <div class="step-num">01</div>
-        <h3>Find everything nearby</h3>
-        <p>Open the app, allow location, and instantly see estate sales, antique stores, auctions, flea markets, and thrift stores on one live map.</p>
+  return (
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24,padding:32,background:"var(--bg)"}}>
+      <h1 style={{fontFamily:"'Playfair Display',Georgia,serif",fontSize:40,fontWeight:900,background:"linear-gradient(135deg,#2C1810 0%,#C4922A 100%)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Fade & Find</h1>
+      <p style={{fontFamily:"monospace",fontSize:11,color:"var(--muted)",letterSpacing:"0.15em",textTransform:"uppercase"}}>Where forgotten things find new homes.</p>
+      <div style={{maxWidth:360,width:"100%",padding:28,background:"var(--card-bg)",borderRadius:12,border:"1px solid var(--border)"}}>
+        <h3 style={{fontFamily:"var(--ff-heading)",fontSize:18,color:"var(--text)",marginBottom:20,textAlign:"center"}}>
+          {mode === "login" ? "Welcome back" : "Create your account"}
+        </h3>
+        <input type="email" placeholder="Email address" value={email} onChange={e=>setEmail(e.target.value)} style={inputStyle}/>
+        <input type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleSubmit()} style={inputStyle}/>
+        {mode === "signup" && (
+          <>
+            <input type="tel" placeholder="Phone number (optional)" value={phone} onChange={e=>setPhone(e.target.value)} style={inputStyle}/>
+            <p style={{fontSize:10,color:"var(--muted)",fontFamily:"var(--ff-mono)",marginBottom:12,marginTop:-8}}>By providing your phone number, you agree to receive SMS messages from Fade & Find. Message and data rates may apply. We will never sell your information.</p>
+          </>
+        )}
+        {error && <p style={{fontSize:12,color:"#C86A6A",marginBottom:12,fontFamily:"var(--ff-mono)"}}>{error}</p>}
+        <button onClick={handleSubmit} disabled={loading} style={{width:"100%",padding:"12px",borderRadius:8,border:"none",background:"var(--accent)",color:"var(--bg)",fontSize:14,fontWeight:700,cursor:loading?"default":"pointer",fontFamily:"var(--ff-heading)",opacity:loading?0.7:1}}>
+          {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
+        </button>
+        <p style={{textAlign:"center",marginTop:16,fontSize:12,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>
+          {mode === "login" ? "New to Fade & Find? " : "Already have an account? "}
+          <span onClick={()=>{setMode(mode==="login"?"signup":"login");setError("");}} style={{color:"var(--accent)",cursor:"pointer",textDecoration:"underline"}}>
+            {mode === "login" ? "Create account" : "Sign in"}
+          </span>
+        </p>
+        <p style={{textAlign:"center",marginTop:8,fontSize:11,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>
+          <span onClick={async()=>{
+            if(!email){setError("Enter your email first");return;}
+            const {error} = await db.auth.resetPasswordForEmail(email);
+            if(error) setError(error.message); else setError("Check your email for a reset link.");
+          }} style={{cursor:"pointer",textDecoration:"underline"}}>Forgot password?</span>
+        </p>
       </div>
-      <div class="step">
-        <div class="step-num">02</div>
-        <h3>Build your route</h3>
-        <p>Pin the spots that look promising. Fade & Find automatically optimizes your stops into the most efficient driving order — then hands it off to Google Maps.</p>
-      </div>
-      <div class="step">
-        <div class="step-num">03</div>
-        <h3>Hunt smarter</h3>
-        <p>Track where you've been, save favorites, flag closed businesses, and share your route with your crew. Every run gets better than the last.</p>
-      </div>
     </div>
-  </section>
+  );
+};
 
-  <div class="divider"></div>
+const CATEGORIES = {
+  estate:   { label: "Estate Sales",   icon: "🏠", color: "#C4922A" },
+  antique:  { label: "Antique Stores", icon: "🏺", color: "#8B6F47" },
+  auction:  { label: "Auctions",       icon: "🔨", color: "#C17F59" },
+  flea:     { label: "Flea Markets",   icon: "🎪", color: "#A67B5B" },
+  thrift:   { label: "Thrift Stores",  icon: "♻️", color: "#9B7653" },
+  boutique: { label: "Boutiques",      icon: "👗", color: "#B07095" },
+};
 
-  <!-- FEATURES -->
-  <section id="features">
-    <span class="section-label">Features</span>
-    <h2 class="section-title">Everything a serious<br/><em>picker needs.</em></h2>
-    <p class="section-desc">Built by someone who actually does this every Saturday. Every feature comes from a real frustration with existing tools.</p>
+// Blacklist: these get a flagged badge instead of silently disappearing
+const BLACKLIST_PATTERNS = [
+  // Hair / personal care
+  /barber/i, /hair salon/i, /hair studio/i, /barbershop/i,
+  // Furniture / big box
+  /furniture mart/i, /nebraska furniture/i,
+  // Entertainment / gaming
+  /pop culture exchange/i, /video game/i, /game store/i, /\bgame on\b/i,
+  // Department / clothing stores
+  /\bhouse of j\b/i, /gordmans/i, /richman/i, /clothing store/i,
+  // Stationery / paper goods
+  /stationery/i, /paper goods/i, /\bfive nine\b/i,
+  // Auto / electronics
+  /auto.?repair/i, /autoerepair/i, /electronics store/i,
+  // Hospitality
+  /bed.?and.?breakfast/i, /\bb&b\b/i, /atelier new wave/i,
+  // Vintage aesthetic only (new goods, not actual vintage)
+  /prairie in bloom/i, /home goods store/i,
+];
 
-    <div class="features-grid">
-      <div class="feature">
-        <div class="feature-icon">🗺️</div>
-        <div>
-          <h4>Live Map</h4>
-          <p>Estate sales, antique stores, auctions, flea markets, thrift stores, and boutiques — all in one place, updated regularly.</p>
+// Boutique remapping: name matches → boutique category
+const BOUTIQUE_PATTERNS = [
+  /boutique/i, /stitch/i, /stitches/i, /clothi/i, /apparel/i, /fashion/i,
+  /patina/i, /pre.?owned.*cloth/i, /designer.*cloth/i,
+];
+
+function classifyListing(name, originalCategory, source) {
+  // Google Places auction houses are permanent venues, not events — flag them
+  if (source === "google_places" && originalCategory === "auction") return { category: originalCategory, flagged: true };
+  if (BLACKLIST_PATTERNS.some(p => p.test(name))) return { category: originalCategory, flagged: true };
+  if (BOUTIQUE_PATTERNS.some(p => p.test(name)))  return { category: "boutique",       flagged: false };
+  return { category: originalCategory, flagged: false };
+}
+
+// ── Transform scraper JSON → UI fields ───────────────
+function transformListing(raw, index) {
+  const distNum  = raw.distance ? parseFloat(raw.distance) : 99;
+  const addrParts = [raw.address, raw.city, raw.state].filter(p => p && p.trim());
+  const name     = raw.name || "Unknown Sale";
+  const { category, flagged } = classifyListing(name, raw.category || "estate", raw.source || "estatesales.net");
+  return {
+    id:          raw.id || String(index),
+    name,
+    category,
+    flagged,
+    lat:         raw.lat || null,
+    lng:         raw.lng || null,
+    address:     addrParts.join(", ") || `${raw.city||""}, ${raw.state||""}`,
+    date:        raw.dates || "—",
+    time:        raw.times || "—",
+    distance:    isNaN(distNum) ? 99 : distNum,
+    rating:      raw.rating || 0,
+    tags:        raw.tags || [],
+    description: raw.description || (raw.company ? `Listed by ${raw.company}` : "Visit the listing page for full details."),
+    featured:    raw.status === "Going on Now!" || raw.status === "Ends Today!",
+    photos:      raw.photo_count || 0,
+    status:      raw.status || "",
+    url:         raw.url || "",
+    company:     raw.company || "",
+    source:      raw.source || "estatesales.net",
+  };
+}
+
+// ── Small UI pieces ───────────────────────────────────
+const StarRating = ({ rating }) => {
+  if (!rating) return <span style={{ color: "var(--muted)", fontSize: 11 }}>New listing</span>;
+  return (
+    <span style={{ fontSize: 12, color: "var(--accent)" }}>
+      {"★".repeat(Math.floor(rating))}
+      {rating % 1 >= 0.5 ? "½" : ""}
+      <span style={{ color: "var(--muted)", marginLeft: 4 }}>{rating}</span>
+    </span>
+  );
+};
+
+const Tag = ({ label }) => (
+  <span style={{
+    display: "inline-block", padding: "2px 8px", fontSize: 10,
+    fontFamily: "var(--ff-mono)", textTransform: "uppercase", letterSpacing: "0.08em",
+    background: "var(--tag-bg)", color: "var(--tag-text)", borderRadius: 3, marginRight: 4, marginBottom: 4,
+  }}>{label}</span>
+);
+
+const CategoryBadge = ({ category, compact }) => {
+  const c = CATEGORIES[category] || CATEGORIES.estate;
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 4,
+      padding: compact ? "2px 6px" : "3px 10px",
+      fontSize: compact ? 10 : 11, fontFamily: "var(--ff-mono)",
+      background: c.color + "22", color: c.color, borderRadius: 3,
+      border: `1px solid ${c.color}44`, textTransform: "uppercase", letterSpacing: "0.06em",
+    }}>
+      <span>{c.icon}</span>{compact ? "" : c.label}
+    </span>
+  );
+};
+
+// ── Map View (Leaflet) ────────────────────────────────
+// allListings  = full dataset (used to build/maintain markers, never changes after load)
+// visibleIds   = Set of IDs currently passing the list filters (controls marker opacity)
+const MapView = ({ allListings, visibleIds, selectedId, onSelect, routeMode, routeStops, onBoundsChange }) => {
+  const mapRef       = useRef(null);
+  const leafletRef   = useRef(null);
+  const markersRef   = useRef({});      // id → { marker, listing }
+  const routeLineRef = useRef(null);
+  const boundsTimerRef = useRef(null);
+  const initialFitDone = useRef(false);
+
+  // ── Init map once ──────────────────────────────────
+  useEffect(() => {
+    if (leafletRef.current) return;
+    const map = L.map(mapRef.current, { zoomControl: false });
+    L.control.zoom({ position: "topright" }).addTo(map);
+
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+      maxZoom: 19,
+    }).addTo(map);
+
+    map.setView([41.54, -96.13], 8);
+    leafletRef.current = map;
+
+    // Debounced bounds reporting — only fires 300ms after the user stops moving
+    const reportBounds = () => {
+      clearTimeout(boundsTimerRef.current);
+      boundsTimerRef.current = setTimeout(() => {
+        const b = map.getBounds();
+        onBoundsChange && onBoundsChange({
+          north: b.getNorth(), south: b.getSouth(),
+          east:  b.getEast(),  west:  b.getWest(),
+        });
+      }, 300);
+    };
+    map.on("moveend zoomend", reportBounds);
+    map.whenReady(reportBounds);
+
+    return () => {
+      clearTimeout(boundsTimerRef.current);
+      map.remove();
+      leafletRef.current = null;
+    };
+  }, []);
+
+  // ── Build markers once when allListings first arrives ──
+  useEffect(() => {
+    const map = leafletRef.current;
+    if (!map || !allListings.length) return;
+
+    // Only add markers that don't already exist
+    const validListings = allListings.filter(l => l.lat && l.lng);
+
+    validListings.forEach(l => {
+      if (markersRef.current[l.id]) return; // already on map
+
+      const cat = CATEGORIES[l.category] || CATEGORIES.estate;
+      const size = 28;
+      const icon = L.divIcon({
+        className: "",
+        html: `<div style="
+          width:${size}px;height:${size}px;border-radius:50%;
+          background:${cat.color};border:2px solid #F5EFE0;
+          display:flex;align-items:center;justify-content:center;
+          font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,0.5);
+          position:relative;
+          ${l.featured ? `box-shadow:0 0 0 3px ${cat.color}44,0 2px 8px rgba(0,0,0,0.5);` : ""}
+        ">${cat.icon}</div>`,
+        iconSize: [size, size],
+        iconAnchor: [size/2, size/2],
+      });
+
+      const marker = L.marker([l.lat, l.lng], { icon })
+        .addTo(map)
+        .on("click", () => onSelect(l.id));
+
+      marker.bindTooltip(
+        `<div style="font-family:sans-serif;font-size:12px;font-weight:600;color:#F5EFE0">${l.name}</div>`,
+        { permanent: false, direction: "top", offset: [0, -size/2], className: "fadeandfind-tooltip" }
+      );
+
+      markersRef.current[l.id] = { marker, listing: l };
+    });
+
+    // Fit bounds only on initial load
+    if (!initialFitDone.current && validListings.length > 0) {
+      initialFitDone.current = true;
+      if (validListings.length > 1) {
+        map.fitBounds(L.latLngBounds(validListings.map(l => [l.lat, l.lng])), { padding: [40, 40] });
+      } else {
+        map.setView([validListings[0].lat, validListings[0].lng], 11);
+      }
+    }
+  }, [allListings]);
+
+  // ── Update marker appearance when selection/route/visibility changes ──
+  useEffect(() => {
+    Object.entries(markersRef.current).forEach(([id, { marker, listing }]) => {
+      const cat      = CATEGORIES[listing.category] || CATEGORIES.estate;
+      const isSel    = selectedId === id;
+      const isRoute  = routeStops.includes(id);
+      const rIdx     = routeStops.indexOf(id);
+      const isVis    = !visibleIds || visibleIds.has(id);
+      const size     = isSel ? 36 : 28;
+
+      // Hide filtered-out markers by setting opacity to 0 (keeps them on map, no DOM churn)
+      marker.setOpacity(isVis ? 1 : 0);
+      marker.getElement() && (marker.getElement().style.pointerEvents = isVis ? "" : "none");
+
+      const icon = L.divIcon({
+        className: "",
+        html: `<div style="
+          width:${size}px;height:${size}px;border-radius:50%;
+          background:${cat.color};border:${isSel ? "3px solid #E8DDD0" : "2px solid #F5EFE0"};
+          display:flex;align-items:center;justify-content:center;
+          font-size:${isSel ? 16 : 13}px;
+          box-shadow:0 2px 8px rgba(0,0,0,0.5);
+          position:relative;
+          ${listing.featured ? `box-shadow:0 0 0 3px ${cat.color}44,0 2px 8px rgba(0,0,0,0.5);` : ""}
+        ">${cat.icon}${isRoute ? `<span style="position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:#C4922A;color:#F5EFE0;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;">${rIdx+1}</span>` : ""}</div>`,
+        iconSize: [size, size],
+        iconAnchor: [size/2, size/2],
+      });
+      marker.setIcon(icon);
+    });
+  }, [selectedId, routeStops, visibleIds]);
+
+  // Pan to selected marker
+  useEffect(() => {
+    const map = leafletRef.current;
+    if (!map || !selectedId) return;
+    const entry = markersRef.current[selectedId];
+    if (entry?.listing?.lat) {
+      map.panTo([entry.listing.lat, entry.listing.lng], { animate: true, duration: 0.5 });
+    }
+  }, [selectedId]);
+
+  // Draw route lines
+  useEffect(() => {
+    const map = leafletRef.current;
+    if (!map) return;
+    if (routeLineRef.current) { map.removeLayer(routeLineRef.current); routeLineRef.current = null; }
+    if (!routeMode || routeStops.length < 2) return;
+    const points = routeStops
+      .map(id => markersRef.current[id]?.listing)
+      .filter(l => l?.lat)
+      .map(l => [l.lat, l.lng]);
+    if (points.length > 1) {
+      routeLineRef.current = L.polyline(points, {
+        color: "#C4922A", weight: 3, dashArray: "8 6", opacity: 0.8,
+      }).addTo(map);
+    }
+  }, [routeMode, routeStops]);
+
+  return (
+    <div style={{ width:"100%", height:480, borderRadius:12, overflow:"hidden", position:"relative", border:"1px solid var(--border)" }}>
+      <div ref={mapRef} style={{ width:"100%", height:"100%" }} />
+      <style>{`
+        .fadeandfind-tooltip { background:#2C1810; color:#F5EFE0; border:none; border-radius:6px; padding:4px 8px; box-shadow:0 2px 8px rgba(0,0,0,0.2); }
+        .fadeandfind-tooltip::before { display:none; }
+        .leaflet-control-zoom { border:none !important; }
+        .leaflet-control-zoom a { background:#EDE5D0 !important; color:#2C1810 !important; border-color:#D4C4A8 !important; }
+        .leaflet-control-attribution { background:rgba(245,239,224,0.9) !important; color:#8A7A65 !important; font-size:9px !important; }
+        .leaflet-control-attribution a { color:#C4922A !important; }
+      `}</style>
+    </div>
+  );
+};
+
+// ── Listing Card ──────────────────────────────────────
+const ListingCard = ({ listing, isSelected, isFavorite, isRouteStop, routeIndex, onSelect, onFavorite, onAddRoute, onUnflag, isClosed, isVerify, onMarkClosed, onMarkVerify, onClearStatus, isBeenThere, onToggleBeenThere, onHide, isGuest, onSignUp }) => {
+  const cat = CATEGORIES[listing.category] || CATEGORIES.estate;
+
+  // Flagged listings render as a compact dismissible warning row
+  if (listing.flagged) {
+    return (
+      <div style={{
+        display:"flex", alignItems:"center", gap:10, padding:"8px 12px",
+        borderRadius:8, marginBottom:6, opacity:0.7,
+        background:"#F0E4D4", border:"1px dashed #C47A5A",
+      }}>
+        <span style={{fontSize:13}}>🚩</span>
+        <div style={{flex:1, minWidth:0}}>
+          <span style={{fontSize:12, color:"#C8856A", fontFamily:"var(--ff-mono)", fontWeight:600}}>{listing.name}</span>
+          <span style={{fontSize:10, color:"var(--muted)", fontFamily:"var(--ff-mono)", marginLeft:8}}>auto-filtered · {listing.address}</span>
         </div>
+        <button
+          onClick={e=>{e.stopPropagation(); onUnflag(listing.id);}}
+          title="Keep this listing"
+          style={{fontSize:11, color:"var(--muted)", background:"none", border:"1px solid var(--border)", borderRadius:4, padding:"2px 7px", cursor:"pointer", fontFamily:"var(--ff-mono)", whiteSpace:"nowrap"}}
+        >Keep</button>
       </div>
-      <div class="feature">
-        <div class="feature-icon">🧭</div>
-        <div>
-          <h4>Route Optimizer</h4>
-          <p>Pick your stops in any order. We figure out the most efficient driving sequence and open it in Google Maps ready to navigate.</p>
-        </div>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">❤️</div>
-        <div>
-          <h4>Favorites & Saved Lists</h4>
-          <p>Save the places worth returning to. Your list syncs across devices so you never lose a good find.</p>
-        </div>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">👣</div>
-        <div>
-          <h4>Been There Tracker</h4>
-          <p>Mark places you've visited so you stop walking into the same antique store twice wondering if you've been there before.</p>
-        </div>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">🚫</div>
-        <div>
-          <h4>Community Reports</h4>
-          <p>Mark businesses as closed or flag them for verification. Keeps the map accurate for everyone.</p>
-        </div>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">👥</div>
-        <div>
-          <h4>Group Sharing</h4>
-          <p>Planning a run with family or friends? Share your full route — stops, addresses, and Maps link — in one tap.</p>
-        </div>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">🔔</div>
-        <div>
-          <h4>Alerts <span style="font-size:11px;background:#C4922A22;color:#C4922A;padding:2px 6px;border-radius:4px;font-family:var(--ff-mono)">Premium</span></h4>
-          <p>Get notified when new estate sales drop in your zip code, so you're never the last to know.</p>
-        </div>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">⏰</div>
-        <div>
-          <h4>Early Access <span style="font-size:11px;background:#C4922A22;color:#C4922A;padding:2px 6px;border-radius:4px;font-family:var(--ff-mono)">Premium</span></h4>
-          <p>See new estate sale listings 24 hours before they go public on EstateSales.NET. First dibs, always.</p>
-        </div>
-      </div>
-    </div>
-  </section>
+    );
+  }
 
-  <div class="divider"></div>
+  const statusBanner = isClosed
+    ? { bg:"#F5D4D4", border:"#C45A5A", color:"#C86A6A", icon:"🚫", label:"Reported Closed · verify before visiting" }
+    : isVerify
+    ? { bg:"#F5EDD4", border:"#B8962A", color:"#C8A86A", icon:"⚠️", label:"Verify First · call ahead or check website" }
+    : null;
 
-  <!-- PRICING -->
-  <section id="pricing" style="text-align:center;">
-    <span class="section-label">Pricing</span>
-    <h2 class="section-title">Start free.<br/><em>Upgrade when you're hooked.</em></h2>
-    <p class="section-desc" style="margin:0 auto 64px;">No credit card required to get started. Upgrade anytime for the full treasure hunting toolkit.</p>
-
-    <div class="pricing-grid">
-      <div class="pricing-card">
-        <div class="pricing-tier">Free</div>
-        <div class="pricing-price">$0</div>
-        <div class="pricing-cadence">forever</div>
-        <ul class="pricing-features">
-          <li>Live map with all venue types</li>
-          <li>Basic filters & search</li>
-          <li>Favorites & saved listings</li>
-          <li>Basic route planning</li>
-          <li>Been There tracker</li>
-          <li>Community reports</li>
-          <li class="locked">Route optimization</li>
-          <li class="locked">Group sharing</li>
-          <li class="locked">Alerts & notifications</li>
-          <li class="locked">24hr early access</li>
-        </ul>
-        <a href="/app" class="btn-pricing btn-pricing-free">Get Started Free</a>
-      </div>
-
-      <div class="pricing-card featured">
-        <div class="pricing-badge">Most Popular</div>
-        <div class="pricing-tier">Premium</div>
-        <div class="pricing-price"><sup>$</sup>4<span style="font-size:28px">.99</span></div>
-        <div class="pricing-cadence">per month · or $39.99/year (save 33%)</div>
-        <ul class="pricing-features">
-          <li>Everything in Free</li>
-          <li>Route optimization</li>
-          <li>Group sharing & collaboration</li>
-          <li>New listing alerts</li>
-          <li>Tag search & filters</li>
-          <li>Been-there archive</li>
-          <li>24hr early access to sales</li>
-          <li>Priority support</li>
-        </ul>
-        <a href="/app" class="btn-pricing btn-pricing-paid">Start Free Trial</a>
-      </div>
-    </div>
-  </section>
-
-  <!-- THE APPRAISER -->
-  <div class="appraiser">
-    <div class="appraiser-card">
-      <div>
-        <div class="appraiser-label">Coming Soon · Premium Feature</div>
-        <h2>Meet <em>The Appraiser.</em></h2>
-        <p>Snap a photo of anything you find — a piece of furniture, a painting, a piece of pottery — and get instant AI-powered identification, estimated value, era, and tips on where to sell it. Your personal expert in your pocket.</p>
-      </div>
-      <div class="appraiser-demo">
-        <div class="appraiser-demo-item">
-          <div class="appraiser-demo-icon">📸</div>
-          <div class="appraiser-demo-text">
-            <h5>Snap a photo</h5>
-            <p>Point your camera at any item you find</p>
+  return (
+    <div onClick={()=>onSelect(listing.id)} style={{
+      padding:"14px 16px", borderRadius:10, cursor:"pointer", marginBottom:8, position:"relative",
+      background: isSelected ? "var(--card-active)" : "var(--card-bg)",
+      border: isSelected ? `2px solid ${cat.color}` : statusBanner ? `1px solid ${statusBanner.border}` : "1px solid var(--border)",
+      opacity: isClosed ? 0.7 : 1,
+      transition:"all 0.2s",
+    }}>
+      {listing.featured && !statusBanner && (
+        <div style={{position:"absolute",top:-1,right:12,background:"var(--accent)",color:"var(--bg)",fontSize:9,fontFamily:"var(--ff-mono)",padding:"2px 8px",borderRadius:"0 0 4px 4px",textTransform:"uppercase",letterSpacing:"0.1em"}}>
+          {listing.status || "Featured"}
+        </div>
+      )}
+      {statusBanner && (
+        <div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",borderRadius:6,background:statusBanner.bg,marginBottom:8,fontSize:11,color:statusBanner.color,fontFamily:"var(--ff-mono)"}}>
+          <span>{statusBanner.icon}</span>
+          <span style={{flex:1}}>{statusBanner.label}</span>
+          <button onClick={e=>{e.stopPropagation();onClearStatus(listing.id);}} style={{fontSize:10,color:"var(--muted)",background:"none",border:"none",cursor:"pointer",textDecoration:"underline",padding:0}}>Undo</button>
+        </div>
+      )}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+            <div style={{fontSize:14,fontWeight:700,color: isClosed ? "var(--muted)" : "var(--text)",fontFamily:"var(--ff-heading)",textDecoration: isClosed ? "line-through" : "none"}}>{listing.name}</div>
+            {isBeenThere && <span style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"#3A7A3A",background:"#C4E8C4",padding:"1px 6px",borderRadius:3,flexShrink:0}}>👣 been</span>}
+          </div>
+          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+            <CategoryBadge category={listing.category} compact/>
+            <span style={{fontSize:11,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>{listing.distance} mi</span>
+            <StarRating rating={listing.rating}/>
           </div>
         </div>
-        <div class="appraiser-demo-item">
-          <div class="appraiser-demo-icon">🔍</div>
-          <div class="appraiser-demo-text">
-            <h5>Instant identification</h5>
-            <p>Era, maker, style, and authenticity markers</p>
-          </div>
-        </div>
-        <div class="appraiser-demo-item">
-          <div class="appraiser-demo-icon">💰</div>
-          <div class="appraiser-demo-text">
-            <h5>Value estimate</h5>
-            <p>Market price range and where to sell</p>
-          </div>
+        <div style={{display:"flex",gap:4,marginLeft:8,flexShrink:0}}>
+          <button onClick={e=>{e.stopPropagation();onFavorite(listing.id);}} style={{width:28,height:28,borderRadius:6,border:"1px solid var(--border)",cursor:"pointer",background:isFavorite?"#C4922A22":"transparent",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {isFavorite?"❤️":"🤍"}
+          </button>
+          <button onClick={e=>{e.stopPropagation();onAddRoute(listing.id);}} style={{width:28,height:28,borderRadius:6,border:"1px solid var(--border)",cursor:"pointer",background:isRouteStop?`${cat.color}22`:"transparent",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+            📍
+            {isRouteStop && <span style={{position:"absolute",top:-4,right:-4,width:14,height:14,borderRadius:"50%",background:"var(--accent)",color:"var(--bg)",fontSize:8,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>{routeIndex+1}</span>}
+          </button>
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- CTA -->
-  <div class="cta-section">
-    <h2>Ready to find your<br/><em>next great score?</em></h2>
-    <p>Join treasure hunters already using Fade & Find to plan smarter Saturday runs.</p>
-    <a href="/app" class="btn-primary">Start Hunting Free →</a>
-  </div>
-
-  <!-- FOOTER -->
-  <footer>
-    <div class="footer-inner">
-      <div class="footer-brand">
-        <div class="logo">Fade & Find</div>
-        <p>Where forgotten things find new homes.</p>
+      <div style={{fontSize:11,color:"var(--muted)",marginBottom:6,fontFamily:"var(--ff-mono)"}}>
+        {listing.address} · {listing.date} · {listing.time}
       </div>
-      <div class="footer-links">
-        <a href="/app">Open App</a>
-        <a href="#pricing">Pricing</a>
-        <a href="/terms">Terms of Service</a>
-        <a href="/privacy">Privacy Policy</a>
-        <a href="mailto:support@fadeandfind.com">Contact</a>
+      {listing.photos > 0 && (
+        <div style={{fontSize:10,color:"var(--muted)",fontFamily:"var(--ff-mono)",marginBottom:4}}>📷 {listing.photos} photos</div>
+      )}
+      {isSelected && (
+        <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid var(--border)"}}>
+          <p style={{fontSize:12.5,color:"var(--text)",lineHeight:1.5,margin:"0 0 8px 0",fontFamily:"var(--ff-body)"}}>{listing.description}</p>
+          {listing.tags.length > 0 && (
+            <div style={{display:"flex",flexWrap:"wrap",gap:2,marginBottom:8}}>
+              {listing.tags.map(t=><Tag key={t} label={t}/>)}
+            </div>
+          )}
+          <div style={{display:"flex",gap:8,marginBottom:8}}>
+            {listing.lat && listing.lng ? (
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&destination=${listing.lat},${listing.lng}&travelmode=driving`}
+                target="_blank" rel="noopener noreferrer"
+                style={{flex:1,padding:"8px 12px",borderRadius:6,border:"none",background:cat.color,color:"#2C1810",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"var(--ff-heading)",textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center"}}
+              >🗺️ Get Directions</a>
+            ) : (
+              <button disabled style={{flex:1,padding:"8px 12px",borderRadius:6,border:"none",background:"var(--border)",color:"var(--muted)",fontSize:12,fontWeight:600,cursor:"default",fontFamily:"var(--ff-heading)"}}>No Location</button>
+            )}
+            {listing.url ? (
+              <a
+                href={listing.source === "google_places" && listing.lat
+                  ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(listing.name)}&query_place_id=${listing.url.split('place_id:')[1] || ''}`
+                  : listing.url}
+                target="_blank" rel="noopener noreferrer"
+                style={{flex:1,padding:"8px 12px",borderRadius:6,border:`1px solid ${cat.color}`,background:"transparent",color:cat.color,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"var(--ff-heading)",textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                {listing.source === "google_places" ? "View on Maps ↗" : "View Listing ↗"}
+              </a>
+            ) : (
+              <button
+                onClick={e=>{
+                  e.stopPropagation();
+                  const text = `${listing.name}\n${listing.address}\n${listing.date} · ${listing.time}`;
+                  if (navigator.share) {
+                    navigator.share({ title: listing.name, text });
+                  } else {
+                    navigator.clipboard?.writeText(text).then(()=>alert("Copied to clipboard!"));
+                  }
+                }}
+                style={{flex:1,padding:"8px 12px",borderRadius:6,border:`1px solid ${cat.color}`,background:"transparent",color:cat.color,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"var(--ff-heading)"}}>
+                Share 📤
+              </button>
+            )}
+          </div>
+          {/* ── Been There / Report row ── */}
+          <div style={{paddingTop:8,borderTop:"1px solid var(--border)"}}>
+            {/* Been There + Hide */}
+            <div style={{display:"flex",gap:6,marginBottom:6}}>
+              <button
+                onClick={e=>{e.stopPropagation(); isGuest ? onSignUp() : onToggleBeenThere(listing.id);}}
+                style={{flex:1,padding:"7px 8px",borderRadius:6,fontSize:11,fontFamily:"var(--ff-mono)",cursor:"pointer",
+                  border: isBeenThere ? "1px solid #4A8A4A" : "1px solid var(--border)",
+                  background: isBeenThere ? "#C4E8C4" : "transparent",
+                  color: isBeenThere ? "#3A7A3A" : "var(--muted)",
+                  fontWeight: isBeenThere ? 700 : 400,
+                }}
+              >{isGuest ? "👣 Been There? 🔒" : isBeenThere ? "👣 Been There" : "👣 Been There?"}</button>
+              {isBeenThere && (
+                <button
+                  onClick={e=>{e.stopPropagation(); onHide(listing.id);}}
+                  style={{flex:1,padding:"7px 8px",borderRadius:6,fontSize:11,fontFamily:"var(--ff-mono)",cursor:"pointer",
+                    border:"1px solid #D4C4A8",background:"#EDE5D0",color:"var(--muted)",
+                  }}
+                >Hide from List 👻</button>
+              )}
+            </div>
+            {/* Closed / Verify */}
+            <div style={{display:"flex",gap:6}}>
+              <span style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"var(--muted)",alignSelf:"center",marginRight:2}}>Report:</span>
+              <button
+                onClick={e=>{e.stopPropagation(); isClosed ? onClearStatus(listing.id) : onMarkClosed(listing.id);}}
+                style={{flex:1,padding:"6px 8px",borderRadius:6,fontSize:11,fontFamily:"var(--ff-mono)",cursor:"pointer",
+                  border: isClosed ? "1px solid #C45A5A" : "1px solid var(--border)",
+                  background: isClosed ? "#F5D4D4" : "transparent",
+                  color: isClosed ? "#C86A6A" : "var(--muted)",
+                  fontWeight: isClosed ? 700 : 400,
+                }}
+              >{isClosed ? "🚫 Closed" : "🚫 Mark Closed"}</button>
+              <button
+                onClick={e=>{e.stopPropagation(); isVerify ? onClearStatus(listing.id) : onMarkVerify(listing.id);}}
+                style={{flex:1,padding:"6px 8px",borderRadius:6,fontSize:11,fontFamily:"var(--ff-mono)",cursor:"pointer",
+                  border: isVerify ? "1px solid #B8962A" : "1px solid var(--border)",
+                  background: isVerify ? "#F5EDD4" : "transparent",
+                  color: isVerify ? "#C8A86A" : "var(--muted)",
+                  fontWeight: isVerify ? 700 : 400,
+                }}
+              >{isVerify ? "⚠️ Verify First" : "⚠️ Verify First"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Filter Panel ──────────────────────────────────────
+const FilterPanel = ({ filters, setFilters, onClose, flaggedListings, onUnflag }) => {
+  const [showFlagged, setShowFlagged] = React.useState(false);
+  return (
+  <div style={{position:"absolute",top:0,left:0,right:0,bottom:0,zIndex:100,background:"var(--bg)",padding:20,overflow:"auto",animation:"slideUp 0.3s ease"}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+      <h3 style={{fontFamily:"var(--ff-heading)",fontSize:20,color:"var(--text)",margin:0}}>Filters</h3>
+      <button onClick={onClose} style={{width:32,height:32,borderRadius:8,border:"1px solid var(--border)",background:"var(--card-bg)",fontSize:16,cursor:"pointer",color:"var(--text)"}}>✕</button>
+    </div>
+    <div style={{marginBottom:20}}>
+      <label style={{fontSize:11,fontFamily:"var(--ff-mono)",color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.1em",display:"block",marginBottom:8}}>Categories</label>
+      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+        {Object.entries(CATEGORIES).map(([key,val])=>{
+          const active = filters.categories.includes(key);
+          return <button key={key} onClick={()=>setFilters(f=>({...f,categories:active?f.categories.filter(c=>c!==key):[...f.categories,key]}))} style={{padding:"6px 12px",borderRadius:6,fontSize:12,cursor:"pointer",border:active?`2px solid ${val.color}`:"1px solid var(--border)",background:active?val.color+"22":"var(--card-bg)",color:active?val.color:"var(--muted)",fontWeight:active?700:400}}>{val.icon} {val.label}</button>;
+        })}
       </div>
     </div>
-    <div class="footer-bottom">
-      <span>© 2026 Fade & Find. All rights reserved.</span>
-      <span>Built with ❤️ for pickers everywhere.</span>
+    <div style={{marginBottom:20}}>
+      <label style={{fontSize:11,fontFamily:"var(--ff-mono)",color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.1em",display:"block",marginBottom:8}}>Max Distance: {filters.maxDistance} miles</label>
+      <input type="range" min={5} max={200} value={filters.maxDistance} onChange={e=>setFilters(f=>({...f,maxDistance:+e.target.value}))} style={{width:"100%",accentColor:"var(--accent)"}}/>
     </div>
-  </footer>
-  <script defer src="/_vercel/insights/script.js"></script>
+    <div style={{marginBottom:20}}>
+      <label style={{fontSize:11,fontFamily:"var(--ff-mono)",color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.1em",display:"block",marginBottom:8}}>Sort By</label>
+      <div style={{display:"flex",gap:6}}>
+        {["distance","rating","date"].map(s=>(
+          <button key={s} onClick={()=>setFilters(f=>({...f,sortBy:s}))} style={{flex:1,padding:"8px 0",borderRadius:6,fontSize:12,cursor:"pointer",border:filters.sortBy===s?"2px solid var(--accent)":"1px solid var(--border)",background:filters.sortBy===s?"var(--accent-bg)":"var(--card-bg)",color:filters.sortBy===s?"var(--accent)":"var(--muted)",fontFamily:"var(--ff-mono)",textTransform:"capitalize",fontWeight:filters.sortBy===s?700:400}}>{s}</button>
+        ))}
+      </div>
+    </div>
+    <div style={{marginBottom:20}}>
+      <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+        <input type="checkbox" checked={filters.featuredOnly} onChange={e=>setFilters(f=>({...f,featuredOnly:e.target.checked}))} style={{accentColor:"var(--accent)"}}/>
+        <span style={{fontSize:13,color:"var(--text)"}}>Active sales only (Ends Today / Going on Now)</span>
+      </label>
+    </div>
+    <div style={{marginBottom:20}}>
+      <label style={{fontSize:11,fontFamily:"var(--ff-mono)",color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.1em",display:"block",marginBottom:8}}>Search Tags</label>
+      <input type="text" value={filters.tagSearch} onChange={e=>setFilters(f=>({...f,tagSearch:e.target.value}))} placeholder="e.g. furniture, jewelry, tools..." style={{width:"100%",padding:"10px 12px",borderRadius:6,border:"1px solid var(--border)",background:"var(--card-bg)",color:"var(--text)",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+    </div>
+    {flaggedListings && flaggedListings.length > 0 && (
+      <div style={{marginTop:8,paddingTop:20,borderTop:"1px solid var(--border)"}}>
+        <div
+          onClick={()=>setShowFlagged(f=>!f)}
+          style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",marginBottom:showFlagged?12:0}}
+        >
+          <label style={{fontSize:11,fontFamily:"var(--ff-mono)",color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.1em",cursor:"pointer"}}>
+            🚩 Auto-Filtered ({flaggedListings.length}) · Tap to {showFlagged?"hide":"show"}
+          </label>
+          <span style={{fontSize:12,color:"var(--muted)"}}>{showFlagged?"▲":"▼"}</span>
+        </div>
+        {showFlagged && flaggedListings.map(l=>(
+          <div key={l.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,marginBottom:6,background:"var(--card-bg)",border:"1px dashed var(--border)"}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:12,fontWeight:600,color:"var(--muted)",fontFamily:"var(--ff-mono)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{l.name}</div>
+              <div style={{fontSize:10,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>{l.address}</div>
+            </div>
+            <button
+              onClick={()=>onUnflag(l.id)}
+              style={{fontSize:11,color:"var(--accent)",background:"none",border:"1px solid var(--accent)",borderRadius:4,padding:"3px 10px",cursor:"pointer",fontFamily:"var(--ff-mono)",whiteSpace:"nowrap",flexShrink:0}}
+            >Keep</button>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+  );
+};
+
+// ── Route optimization (nearest-neighbor) ────────────
+function optimizeRoute(listings) {
+  if (listings.length <= 2) return listings;
+  const remaining = [...listings];
+  const route = [remaining.shift()]; // start with first selected
+  while (remaining.length) {
+    const last = route[route.length - 1];
+    let nearestIdx = 0;
+    let nearestDist = Infinity;
+    remaining.forEach((l, i) => {
+      if (!l.lat || !l.lng || !last.lat || !last.lng) return;
+      const d = Math.hypot(l.lat - last.lat, l.lng - last.lng);
+      if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
+    });
+    route.push(remaining.splice(nearestIdx, 1)[0]);
+  }
+  return route;
+}
+
+function buildGoogleMapsUrl(listings) {
+  const valid = listings.filter(l => l.lat && l.lng);
+  if (!valid.length) return null;
+  if (valid.length === 1) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${valid[0].lat},${valid[0].lng}`;
+  }
+  const origin      = `${valid[0].lat},${valid[0].lng}`;
+  const destination = `${valid[valid.length-1].lat},${valid[valid.length-1].lng}`;
+  const waypoints   = valid.slice(1, -1).map(l => `${l.lat},${l.lng}`).join("|");
+  let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+  if (waypoints) url += `&waypoints=${encodeURIComponent(waypoints)}`;
+  return url;
+}
+
+// ── Premium Gate ──────────────────────────────────────
+const MONTHLY_PRICE_ID = "price_1TMAncPyw8l0vrgFSh3j9kIy";
+const ANNUAL_PRICE_ID  = "price_1TMAncPyw8l0vrgFg35WrJN8";
+
+const PremiumGate = ({ children, isPremium, isGuest, feature, onSignUp, user }) => {
+  const [showPrompt, setShowPrompt] = React.useState(false);
+  const [billing, setBilling]       = React.useState("monthly");
+  const [loading, setLoading]       = React.useState(false);
+  const [checkoutError, setCheckoutError] = React.useState("");
+
+  if (isPremium) return children;
+
+  const handleUpgrade = async () => {
+    if (isGuest) { setShowPrompt(false); onSignUp && onSignUp(); return; }
+    const resolvedUser = user || _currentUser;
+    if (!resolvedUser) { setCheckoutError("Please sign in again."); return; }
+    setLoading(true);
+    setCheckoutError("");
+    try {
+      const priceId = billing === "annual" ? ANNUAL_PRICE_ID : MONTHLY_PRICE_ID;
+      const res = await fetch("/api/create-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceId, userId: resolvedUser.id, userEmail: resolvedUser.email }),
+      });
+      const json = await res.json();
+      if (json.url) {
+        window.location.href = json.url;
+      } else {
+        setCheckoutError("Something went wrong. Please try again.");
+        setLoading(false);
+      }
+    } catch (e) {
+      setCheckoutError("Something went wrong. Please try again.");
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{position:"relative"}}>
+      <div style={{opacity:0.4, pointerEvents:"none", userSelect:"none"}}>{children}</div>
+      <div
+        onClick={()=>setShowPrompt(true)}
+        style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",borderRadius:10,background:"rgba(245,239,224,0.85)",backdropFilter:"blur(2px)"}}
+      >
+        <div style={{fontSize:20,marginBottom:6}}>⭐</div>
+        <div style={{fontSize:13,fontWeight:700,color:"var(--text)",fontFamily:"var(--ff-heading)",marginBottom:4}}>Premium Feature</div>
+        <div style={{fontSize:11,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>{feature}</div>
+      </div>
+      {showPrompt && (
+        <div style={{position:"fixed",inset:0,zIndex:300,background:"rgba(44,24,16,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setShowPrompt(false)}>
+          <div style={{background:"var(--bg)",borderRadius:16,padding:32,maxWidth:340,width:"100%",textAlign:"center",boxShadow:"0 8px 40px rgba(0,0,0,0.2)"}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:36,marginBottom:12}}>⭐</div>
+            <h3 style={{fontFamily:"var(--ff-heading)",fontSize:20,fontWeight:900,marginBottom:8,color:"var(--text)"}}>Upgrade to Premium</h3>
+            <p style={{fontSize:13,color:"var(--muted)",marginBottom:16,lineHeight:1.6}}>
+              <strong style={{color:"var(--text)"}}>{feature}</strong> is a Premium feature.
+              Get route optimization, group sharing, alerts, and more.
+            </p>
+            {!isGuest && (
+              <div style={{display:"flex",borderRadius:8,border:"1px solid var(--border)",overflow:"hidden",marginBottom:20}}>
+                <button
+                  onClick={()=>setBilling("monthly")}
+                  style={{flex:1,padding:"10px",border:"none",cursor:"pointer",fontFamily:"var(--ff-mono)",fontSize:12,fontWeight:billing==="monthly"?700:400,background:billing==="monthly"?"var(--accent)":"transparent",color:billing==="monthly"?"#F5EFE0":"var(--muted)",transition:"all 0.2s"}}
+                >$4.99 / mo</button>
+                <button
+                  onClick={()=>setBilling("annual")}
+                  style={{flex:1,padding:"10px",border:"none",cursor:"pointer",fontFamily:"var(--ff-mono)",fontSize:12,fontWeight:billing==="annual"?700:400,background:billing==="annual"?"var(--accent)":"transparent",color:billing==="annual"?"#F5EFE0":"var(--muted)",transition:"all 0.2s"}}
+                >$39.99 / yr <span style={{fontSize:10,opacity:0.8}}>Save 33%</span></button>
+              </div>
+            )}
+            {checkoutError && (
+              <p style={{fontSize:12,color:"#C86A6A",marginBottom:12,fontFamily:"var(--ff-mono)"}}>{checkoutError}</p>
+            )}
+            <button
+              onClick={handleUpgrade}
+              disabled={loading}
+              style={{width:"100%",padding:"13px",borderRadius:8,border:"none",background:"var(--accent)",color:"#F5EFE0",fontSize:14,fontWeight:700,cursor:loading?"default":"pointer",fontFamily:"var(--ff-heading)",marginBottom:10,opacity:loading?0.7:1}}
+            >{loading ? "Redirecting to checkout..." : isGuest ? "Create Free Account →" : "Upgrade to Premium →"}</button>
+            <button onClick={()=>setShowPrompt(false)} style={{width:"100%",padding:"10px",borderRadius:8,border:"1px solid var(--border)",background:"transparent",color:"var(--muted)",fontSize:13,cursor:"pointer",fontFamily:"var(--ff-mono)"}}>Maybe later</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Route Panel ───────────────────────────────────────
+const RoutePanel = ({ stops, listings, onRemove, onClear, onReorder }) => {
+  const [optimized, setOptimized] = React.useState(false);
+  const stopListings = stops.map(id => listings.find(l => l.id === id)).filter(Boolean);
+
+  const handleOptimize = () => {
+    const sorted = optimizeRoute([...stopListings]);
+    onReorder(sorted.map(l => l.id));
+    setOptimized(true);
+  };
+
+  const handleNavigate = () => {
+    const url = buildGoogleMapsUrl(stopListings);
+    if (url) window.open(url, "_blank");
+  };
+
+  const handleOptimizeAndNavigate = () => {
+    const sorted = optimizeRoute([...stopListings]);
+    onReorder(sorted.map(l => l.id));
+    setOptimized(true);
+    const url = buildGoogleMapsUrl(sorted);
+    if (url) window.open(url, "_blank");
+  };
+
+  // Rough total: sum of sequential distances between stops
+  let totalMiles = 0;
+  for (let i = 0; i < stopListings.length - 1; i++) {
+    const a = stopListings[i], b = stopListings[i+1];
+    if (a.lat && b.lat) {
+      // ~69 miles per degree latitude, ~53 miles per degree longitude at ~41°N
+      totalMiles += Math.hypot((b.lat - a.lat) * 69, (b.lng - a.lng) * 53);
+    }
+  }
+
+  return (
+    <div style={{padding:16,background:"var(--card-bg)",borderRadius:10,border:"1px solid var(--border)",marginBottom:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <h4 style={{margin:0,fontFamily:"var(--ff-heading)",fontSize:15,color:"var(--text)"}}>
+          Route Plan
+          <span style={{fontFamily:"var(--ff-mono)",fontSize:11,color:"var(--muted)",fontWeight:400,marginLeft:6}}>
+            ({stops.length} stop{stops.length!==1?"s":""}{totalMiles>0 ? ` · ~${totalMiles.toFixed(0)} mi` : ""})
+          </span>
+          {optimized && <span style={{fontFamily:"var(--ff-mono)",fontSize:10,color:"#3A7A3A",marginLeft:8}}>✓ optimized</span>}
+        </h4>
+        <button onClick={onClear} style={{fontSize:11,color:"var(--muted)",background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>Clear</button>
+      </div>
+
+      {stopListings.map((l,i) => (
+        <div key={l.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:i<stopListings.length-1?"1px solid var(--border)":"none"}}>
+          <span style={{width:22,height:22,borderRadius:"50%",background:"var(--accent)",color:"var(--bg)",fontSize:11,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{i+1}</span>
+          <span style={{flex:1,fontSize:12,color:"var(--text)"}}>{l.name}</span>
+          <span style={{fontSize:10,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>{(CATEGORIES[l.category]||CATEGORIES.estate).icon}</span>
+          <button onClick={()=>{ onRemove(l.id); setOptimized(false); }} style={{width:20,height:20,borderRadius:4,border:"1px solid var(--border)",background:"transparent",fontSize:10,cursor:"pointer",color:"var(--muted)",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+        </div>
+      ))}
+
+      <div style={{display:"flex",gap:8,marginTop:10}}>
+        {!optimized && stopListings.length >= 3 && (
+          <button onClick={handleOptimize} style={{flex:1,padding:"10px",borderRadius:6,border:"1px solid var(--accent)",background:"transparent",color:"var(--accent)",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"var(--ff-heading)"}}>
+            ⚡ Optimize Order
+          </button>
+        )}
+        <button
+          onClick={handleOptimizeAndNavigate}
+          disabled={stopListings.length < 1}
+          style={{flex:2,padding:"10px",borderRadius:6,border:"none",background:stopListings.length<1?"var(--border)":"var(--accent)",color:stopListings.length<1?"var(--muted)":"var(--bg)",fontSize:13,fontWeight:700,cursor:stopListings.length<1?"default":"pointer",fontFamily:"var(--ff-heading)"}}
+        >
+          🧭 {optimized ? "Open in Maps" : "Optimize & Navigate"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── Group Panel ───────────────────────────────────────
+const GroupPanel = ({ routeStops, listings }) => {
+  const [groups, setGroups] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem("ff_groups") || "[]"); } catch { return []; }
+  });
+  const [shared, setShared] = React.useState(null);
+  const [showCreate, setShowCreate] = React.useState(false);
+  const [newName, setNewName] = React.useState("");
+  const [newMembers, setNewMembers] = React.useState("");
+  const [newPhones, setNewPhones] = React.useState("");
+
+  const GROUP_COLORS = ["#C4922A","#8B6F47","#6B8E6B","#7B6B8E","#8E6B6B","#6B8E8E"];
+  const GROUP_ICONS  = ["⚡","🗺️","🏺","🔍","💎","🌿"];
+
+  const saveGroups = (next) => {
+    setGroups(next);
+    try { localStorage.setItem("ff_groups", JSON.stringify(next)); } catch {}
+  };
+
+  const handleCreate = () => {
+    if (!newName.trim()) return;
+    const members = newMembers.split(",").map(m => m.trim()).filter(Boolean);
+    const phones = newPhones.split(",").map(p => p.trim().replace(/\D/g,'')).filter(p => p.length >= 10);
+    const idx = groups.length % GROUP_COLORS.length;
+    const newGroup = {
+      id: Date.now(),
+      name: newName.trim(),
+      members: ["You", ...members],
+      phones,
+      color: GROUP_COLORS[idx],
+      icon: GROUP_ICONS[idx],
+    };
+    saveGroups([...groups, newGroup]);
+    setNewName(""); setNewMembers(""); setNewPhones(""); setShowCreate(false);
+  };
+
+  const handleDelete = (id) => {
+    if (window.confirm("Remove this group?")) saveGroups(groups.filter(g => g.id !== id));
+  };
+
+  const handleShareRoute = (group) => {
+    if (!routeStops.length) { alert("No route planned yet — pin some stops on the map first!"); return; }
+    const stopListings = routeStops.map(id => listings.find(l => l.id === id)).filter(Boolean);
+    const mapsUrl = buildGoogleMapsUrl(stopListings);
+    const lines = [
+      `📍 Fade & Find Route — ${new Date().toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}`,
+      `Group: ${group.name}`, "",
+      ...stopListings.map((l,i) => `${i+1}. ${l.name} (${l.address})`), "",
+      mapsUrl ? `🗺️ Maps: ${mapsUrl}` : "",
+    ].filter(Boolean);
+    const text = lines.join("\n");
+    // Get phone numbers from group members (filter out "You" and non-phone entries)
+    const phones = (group.phones || []).filter(Boolean);
+    if (phones.length > 0) {
+      // SMS to all phone numbers
+      const to = phones.join(",");
+      window.open(`sms:${to}?body=${encodeURIComponent(text)}`, "_blank");
+      setShared(group.id);
+      setTimeout(() => setShared(null), 2500);
+    } else if (navigator.share) {
+      navigator.share({ title: `Fade & Find Route · ${group.name}`, text }).then(() => setShared(group.id)).catch(() => {});
+    } else {
+      navigator.clipboard?.writeText(text).then(() => { setShared(group.id); setTimeout(() => setShared(null), 2500); });
+    }
+  };
+
+  const inputStyle = { width:"100%", padding:"9px 12px", borderRadius:6, border:"1px solid var(--border)", background:"var(--bg)", color:"var(--text)", fontSize:13, outline:"none", fontFamily:"var(--ff-mono)", marginBottom:8 };
+
+  return (
+    <div>
+      {!routeStops.length && (
+        <div style={{padding:"10px 14px",borderRadius:8,background:"#E8DECE",border:"1px dashed var(--border)",marginBottom:12,fontSize:12,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>
+          📍 Pin stops on the map to build a route, then share it here.
+        </div>
+      )}
+      <div style={{padding:16,background:"var(--card-bg)",borderRadius:10,border:"1px solid var(--border)",marginBottom:12}}>
+        <h4 style={{margin:"0 0 12px 0",fontFamily:"var(--ff-heading)",fontSize:15,color:"var(--text)"}}>Your Groups</h4>
+        {groups.length === 0 && (
+          <p style={{fontSize:12,color:"var(--muted)",fontFamily:"var(--ff-mono)",marginBottom:12}}>No groups yet — create one to start sharing routes.</p>
+        )}
+        {groups.map(g=>(
+          <div key={g.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid var(--border)"}}>
+            <span style={{width:32,height:32,borderRadius:8,background:g.color+"22",border:`1px solid ${g.color}44`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>{g.icon}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:600,color:"var(--text)",fontFamily:"var(--ff-heading)"}}>{g.name}</div>
+              <div style={{fontSize:11,color:"var(--muted)",fontFamily:"var(--ff-mono)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.members.join(", ")}</div>
+            </div>
+            <button onClick={()=>handleShareRoute(g)} style={{padding:"4px 10px",borderRadius:6,border:`1px solid ${shared===g.id?"#3A7A3A":g.color}`,background:shared===g.id?"#C4E8C4":"transparent",color:shared===g.id?"#3A7A3A":g.color,fontSize:11,cursor:"pointer",transition:"all 0.2s",fontFamily:"var(--ff-mono)",flexShrink:0}}>
+              {shared===g.id ? "✓ Sent!" : "Share"}
+            </button>
+            <button onClick={()=>handleDelete(g.id)} style={{width:24,height:24,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--muted)",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
+          </div>
+        ))}
+
+        {showCreate ? (
+          <div style={{marginTop:12,padding:12,borderRadius:8,background:"var(--bg)",border:"1px solid var(--border)"}}>
+            <input type="text" placeholder="Group name (e.g. Weekend Warriors)" value={newName} onChange={e=>setNewName(e.target.value)} style={inputStyle}/>
+            <input type="text" placeholder="Member names (comma-separated, e.g. Jack, Thea)" value={newMembers} onChange={e=>setNewMembers(e.target.value)} style={inputStyle}/>
+            <input type="tel" placeholder="Phone numbers (comma-separated, e.g. 4025551234, 4025555678)" value={newPhones} onChange={e=>setNewPhones(e.target.value)} style={{...inputStyle, marginBottom:10}} onKeyDown={e=>e.key==="Enter"&&handleCreate()}/>
+            <p style={{fontSize:10,color:"var(--muted)",fontFamily:"var(--ff-mono)",marginBottom:10,marginTop:-6}}>Phone numbers are used to send SMS route shares.</p>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={handleCreate} disabled={!newName.trim()} style={{flex:1,padding:"8px",borderRadius:6,border:"none",background:"var(--accent)",color:"#F5EFE0",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"var(--ff-heading)"}}>Create Group</button>
+              <button onClick={()=>{setShowCreate(false);setNewName("");setNewMembers("");}} style={{flex:1,padding:"8px",borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--muted)",fontSize:12,cursor:"pointer",fontFamily:"var(--ff-mono)"}}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={()=>setShowCreate(true)} style={{width:"100%",marginTop:12,padding:"8px",borderRadius:6,border:"1px dashed var(--border)",background:"transparent",color:"var(--muted)",fontSize:12,cursor:"pointer",fontFamily:"var(--ff-mono)"}}>+ Create New Group</button>
+        )}
+      </div>
+
+      {routeStops.length > 0 && (
+        <div style={{padding:14,background:"var(--card-bg)",borderRadius:10,border:"1px solid var(--border)"}}>
+          <p style={{fontSize:11,fontFamily:"var(--ff-mono)",color:"var(--muted)",margin:"0 0 8px 0",textTransform:"uppercase",letterSpacing:"0.08em"}}>Current Route · {routeStops.length} stop{routeStops.length!==1?"s":""}</p>
+          {routeStops.map((id,i) => {
+            const l = listings.find(x=>x.id===id);
+            if (!l) return null;
+            return (
+              <div key={id} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0"}}>
+                <span style={{width:18,height:18,borderRadius:"50%",background:"var(--accent)",color:"var(--bg)",fontSize:10,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{i+1}</span>
+                <span style={{fontSize:12,color:"var(--text)"}}>{l.name}</span>
+                <span style={{fontSize:10,color:"var(--muted)",fontFamily:"var(--ff-mono)",marginLeft:"auto"}}>{(CATEGORIES[l.category]||CATEGORIES.estate).icon}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Alert Panel ───────────────────────────────────────
+const AlertPanel = ({ alerts, setAlerts }) => (
+  <div style={{padding:16,background:"var(--card-bg)",borderRadius:10,border:"1px solid var(--border)",marginBottom:12}}>
+    <h4 style={{margin:"0 0 12px 0",fontFamily:"var(--ff-heading)",fontSize:15,color:"var(--text)"}}>Alerts & Notifications</h4>
+    {[
+      {key:"newEstates",    label:"New estate sales within 30mi",       icon:"🏠"},
+      {key:"auctionReminders", label:"Auction day reminders",           icon:"🔨"},
+      {key:"tagMatches",   label:"Tag matches (jewelry, furniture)",    icon:"🏷️"},
+    ].map(a=>(
+      <label key={a.key} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid var(--border)",cursor:"pointer"}}>
+        <span style={{fontSize:16}}>{a.icon}</span>
+        <span style={{flex:1,fontSize:12,color:"var(--text)"}}>{a.label}</span>
+        <div onClick={()=>setAlerts(prev=>({...prev,[a.key]:!prev[a.key]}))} style={{width:38,height:20,borderRadius:10,cursor:"pointer",position:"relative",background:alerts[a.key]?"var(--accent)":"var(--border)",transition:"background 0.2s"}}>
+          <div style={{width:16,height:16,borderRadius:"50%",background:"#fff",position:"absolute",top:2,left:alerts[a.key]?20:2,transition:"left 0.2s"}}/>
+        </div>
+      </label>
+    ))}
+  </div>
+);
+
+// ── Appraiser Modal ───────────────────────────────────
+const FREE_APPRAISAL_LIMIT = 2;
+
+const AppraiserModal = ({ user, isPremium, appraiserUses, setAppraiserUses, onClose, saveToSupabase }) => {
+  const [image, setImage]           = React.useState(null);
+  const [imageData, setImageData]   = React.useState(null);
+  const [loading, setLoading]       = React.useState(false);
+  const [result, setResult]         = React.useState(null);
+  const [error, setError]           = React.useState("");
+  const [history, setHistory]       = React.useState([]);
+  const [showHistory, setShowHistory] = React.useState(false);
+  const fileInputRef = React.useRef(null);
+
+  const canUse = isPremium || appraiserUses < FREE_APPRAISAL_LIMIT;
+  const usesLeft = FREE_APPRAISAL_LIMIT - appraiserUses;
+
+  // Load history on mount
+  React.useEffect(() => {
+    if (!user) return;
+    db.from("appraisals").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20)
+      .then(({ data }) => { if (data) setHistory(data); });
+  }, []);
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setImage(ev.target.result);
+      setImageData(ev.target.result.split(",")[1]);
+      setResult(null);
+      setError("");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAppraise = async () => {
+    if (!imageData) return;
+    if (!canUse) return;
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/appraise", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageData, mediaType: "image/jpeg" }),
+      });
+      const parsed = await response.json();
+      if (!response.ok || parsed.error) {
+        setError("Couldn't analyze this image. Please try again with a clearer photo.");
+        setLoading(false);
+        return;
+      }
+      setResult(parsed);
+
+      // Save to appraisals table
+      if (user) {
+        await db.from("appraisals").insert({
+          user_id: user.id,
+          result: parsed,
+          created_at: new Date().toISOString(),
+        });
+        setHistory(prev => [{ result: parsed, created_at: new Date().toISOString(), id: Date.now() }, ...prev]);
+      }
+
+      // Increment use count for free users
+      if (!isPremium) {
+        const newCount = appraiserUses + 1;
+        setAppraiserUses(newCount);
+        await saveToSupabase({ appraiser_uses: newCount });
+      }
+    } catch (e) {
+      setError("Couldn't analyze this image. Please try again with a clearer photo.");
+    }
+    setLoading(false);
+  };
+
+  const handleDelete = async (id) => {
+    await db.from("appraisals").delete().eq("id", id);
+    setHistory(prev => prev.filter(h => h.id !== id));
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:300,background:"rgba(44,24,16,0.6)",display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+      <div style={{background:"var(--bg)",borderRadius:"16px 16px 0 0",width:"100%",maxWidth:500,maxHeight:"90vh",overflow:"auto",padding:24,animation:"slideUp 0.3s ease"}} onClick={e=>e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <div>
+            <h3 style={{fontFamily:"var(--ff-heading)",fontSize:20,fontWeight:900,color:"var(--text)"}}>📸 The Appraiser</h3>
+            <p style={{fontSize:11,fontFamily:"var(--ff-mono)",color:"var(--muted)"}}>
+              {isPremium ? "Unlimited appraisals · Premium" : `${Math.max(0, usesLeft)} free appraisal${usesLeft !== 1 ? "s" : ""} remaining`}
+            </p>
+          </div>
+          <button onClick={onClose} style={{width:28,height:28,borderRadius:"50%",border:"1px solid var(--border)",background:"var(--card-bg)",cursor:"pointer",fontSize:14,color:"var(--muted)"}}>✕</button>
+        </div>
+
+        {/* Paywall */}
+        {!canUse && (
+          <div style={{textAlign:"center",padding:"24px 0",borderBottom:"1px solid var(--border)",marginBottom:20}}>
+            <div style={{fontSize:32,marginBottom:8}}>⭐</div>
+            <h4 style={{fontFamily:"var(--ff-heading)",fontSize:16,marginBottom:8,color:"var(--text)"}}>You've used your free appraisals</h4>
+            <p style={{fontSize:13,color:"var(--muted)",marginBottom:16,fontFamily:"var(--ff-body)"}}>Upgrade to Premium for unlimited appraisals.</p>
+            <a href="/app" style={{display:"inline-block",padding:"12px 28px",borderRadius:8,background:"var(--accent)",color:"#F5EFE0",fontSize:14,fontWeight:700,textDecoration:"none",fontFamily:"var(--ff-heading)"}}>Upgrade to Premium →</a>
+          </div>
+        )}
+
+        {/* Upload area */}
+        {canUse && (
+          <>
+            <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageSelect} style={{display:"none"}}/>
+            {!image ? (
+              <div
+                onClick={()=>fileInputRef.current?.click()}
+                style={{border:"2px dashed var(--border)",borderRadius:12,padding:32,textAlign:"center",cursor:"pointer",marginBottom:16,background:"var(--card-bg)",transition:"all 0.2s"}}
+              >
+                <div style={{fontSize:36,marginBottom:8}}>📷</div>
+                <p style={{fontSize:14,fontWeight:600,color:"var(--text)",fontFamily:"var(--ff-heading)",marginBottom:4}}>Take or upload a photo</p>
+                <p style={{fontSize:12,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>Tap to open camera or choose from gallery</p>
+                {!isPremium && <p style={{fontSize:11,color:"var(--accent)",fontFamily:"var(--ff-mono)",marginTop:8}}>{usesLeft} free use{usesLeft !== 1 ? "s" : ""} remaining</p>}
+              </div>
+            ) : (
+              <div style={{marginBottom:16}}>
+                <img src={image} alt="Item to appraise" style={{width:"100%",borderRadius:10,maxHeight:280,objectFit:"cover",marginBottom:10}}/>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>{setImage(null);setImageData(null);setResult(null);}} style={{flex:1,padding:"8px",borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--muted)",fontSize:12,cursor:"pointer",fontFamily:"var(--ff-mono)"}}>Change Photo</button>
+                  <button
+                    onClick={handleAppraise}
+                    disabled={loading}
+                    style={{flex:2,padding:"8px",borderRadius:6,border:"none",background:"var(--accent)",color:"#F5EFE0",fontSize:13,fontWeight:700,cursor:loading?"default":"pointer",fontFamily:"var(--ff-heading)",opacity:loading?0.7:1}}
+                  >{loading ? "Analyzing..." : "Appraise This Item"}</button>
+                </div>
+              </div>
+            )}
+
+            {error && <p style={{fontSize:12,color:"#C86A6A",fontFamily:"var(--ff-mono)",marginBottom:12}}>{error}</p>}
+
+            {/* Result */}
+            {result && (
+              <div style={{background:"var(--card-bg)",borderRadius:10,padding:16,marginBottom:16,border:"1px solid var(--border)",animation:"fadeIn 0.3s ease"}}>
+                <h4 style={{fontFamily:"var(--ff-heading)",fontSize:16,fontWeight:700,color:"var(--text)",marginBottom:12}}>{result.item}</h4>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+                  <div style={{background:"var(--bg)",borderRadius:8,padding:10}}>
+                    <p style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>Era</p>
+                    <p style={{fontSize:13,color:"var(--text)",fontWeight:600}}>{result.era}</p>
+                  </div>
+                  <div style={{background:"var(--bg)",borderRadius:8,padding:10}}>
+                    <p style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>Style</p>
+                    <p style={{fontSize:13,color:"var(--text)",fontWeight:600}}>{result.style}</p>
+                  </div>
+                  <div style={{background:"var(--bg)",borderRadius:8,padding:10}}>
+                    <p style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>Condition</p>
+                    <p style={{fontSize:13,color:"var(--text)",fontWeight:600}}>{result.condition}</p>
+                  </div>
+                  <div style={{background:"#C4922A18",borderRadius:8,padding:10,border:"1px solid #C4922A44"}}>
+                    <p style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"var(--accent)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>Est. Value</p>
+                    <p style={{fontSize:14,color:"var(--accent)",fontWeight:800}}>${result.value_low}–${result.value_high}</p>
+                  </div>
+                </div>
+                {result.best_to_sell?.length > 0 && (
+                  <div style={{marginBottom:10}}>
+                    <p style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"var(--muted)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>Best Places to Sell</p>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                      {result.best_to_sell.map((s,i)=><span key={i} style={{fontSize:11,fontFamily:"var(--ff-mono)",background:"var(--tag-bg)",color:"var(--tag-text)",padding:"3px 8px",borderRadius:4}}>{s}</span>)}
+                    </div>
+                  </div>
+                )}
+                {result.notes && <p style={{fontSize:12,color:"var(--muted)",fontFamily:"var(--ff-body)",lineHeight:1.5,borderTop:"1px solid var(--border)",paddingTop:10,marginTop:4}}>{result.notes}</p>}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* History */}
+        {history.length > 0 && (
+          <div>
+            <button onClick={()=>setShowHistory(h=>!h)} style={{width:"100%",padding:"8px",borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--muted)",fontSize:12,cursor:"pointer",fontFamily:"var(--ff-mono)",marginBottom:showHistory?12:0}}>
+              {showHistory ? "▲ Hide" : "▼ Show"} History ({history.length})
+            </button>
+            {showHistory && history.map((h,i)=>(
+              <div key={h.id || i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:8,background:"var(--card-bg)",border:"1px solid var(--border)",marginBottom:6}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <p style={{fontSize:13,fontWeight:600,color:"var(--text)",fontFamily:"var(--ff-heading)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{h.result?.item || "Unknown item"}</p>
+                  <p style={{fontSize:11,color:"var(--accent)",fontFamily:"var(--ff-mono)"}}>${h.result?.value_low}–${h.result?.value_high}</p>
+                  <p style={{fontSize:10,color:"var(--muted)",fontFamily:"var(--ff-mono)"}}>{new Date(h.created_at).toLocaleDateString()}</p>
+                </div>
+                <button onClick={()=>handleDelete(h.id)} style={{width:24,height:24,borderRadius:6,border:"1px solid var(--border)",background:"transparent",color:"var(--muted)",fontSize:11,cursor:"pointer",flexShrink:0}}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── Start Screen — combined location + auth ───────────
+const StartScreen = ({ user, onLoad, onAuth }) => {
+  const [tab, setTab]       = useState("find");
+  const [authMode, setAuthMode] = useState("login");
+  const [email, setEmail]   = useState("");
+  const [password, setPassword] = useState("");
+  const [phone, setPhone]   = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [status, setStatus] = useState("idle");
+  const [locError, setLocError] = useState("");
+  const [zip, setZip]       = useState(() => {
+    try { return localStorage.getItem("ff_last_zip") || ""; } catch { return ""; }
+  });
+  const [radius, setRadius] = useState(() => {
+    try { return parseInt(localStorage.getItem("ff_radius") || "100"); } catch { return 100; }
+  });
+
+  const saveRadius = (r) => {
+    setRadius(r);
+    try { localStorage.setItem("ff_radius", String(r)); } catch {}
+  };
+
+  const loadFromSupabase = async (lat, lng, radiusMiles, label) => {
+    setStatus("loading");
+    try {
+      const latDelta = radiusMiles / 69;
+      const lngDelta = radiusMiles / 53;
+      const url = `${SUPA_URL}/rest/v1/listings?lat=gte.${lat - latDelta}&lat=lte.${lat + latDelta}&lng=gte.${lng - lngDelta}&lng=lte.${lng + lngDelta}&select=*&limit=500`;
+      const resp = await fetch(url, {
+        headers: { "apikey": SUPA_KEY, "Authorization": `Bearer ${SUPA_KEY}` }
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const raw = await resp.json();
+      if (!raw.length) {
+        setLocError("No listings found in this area yet. Try a larger radius.");
+        setStatus("error");
+        return;
+      }
+      onLoad(raw.map((r, i) => transformListing(r, i)), label);
+    } catch (e) {
+      setLocError(`Couldn't load listings: ${e.message}`);
+      setStatus("error");
+    }
+  };
+
+  const handleUseLocation = () => {
+    setStatus("locating"); setLocError("");
+    if (!navigator.geolocation) { setLocError("Location not supported — try a zip code."); setStatus("error"); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => loadFromSupabase(pos.coords.latitude, pos.coords.longitude, radius, "Your Location"),
+      () => { setLocError("Location denied — enter a zip code instead."); setStatus("error"); }
+    );
+  };
+
+  const handleZipSearch = async (zipOverride) => {
+    const searchZip = zipOverride || zip;
+    if (!searchZip.trim()) return;
+    setStatus("locating"); setLocError("");
+    try {
+      const resp = await fetch(`https://nominatim.openstreetmap.org/search?q=${searchZip}&format=json&limit=1`, { headers: { "User-Agent": "FadeAndFind/1.0" } });
+      const results = await resp.json();
+      if (!results.length) throw new Error("Location not found");
+      try { localStorage.setItem("ff_last_zip", searchZip); } catch {}
+      loadFromSupabase(parseFloat(results[0].lat), parseFloat(results[0].lon), radius, searchZip);
+    } catch (e) { setLocError(`Couldn't find that location: ${e.message}`); setStatus("error"); }
+  };
+
+  const handleAuth = async () => {
+    setAuthError(""); setAuthLoading(true);
+    try {
+      const result = authMode === "login"
+        ? await db.auth.signInWithPassword({ email, password })
+        : await db.auth.signUp({ email, password });
+      if (result.error) { setAuthError(result.error.message); }
+      else {
+        const newUser = result.data.user;
+        if (authMode === "signup" && newUser) {
+          const cleanPhone = phone.trim() ? phone.trim().replace(/\D/g, '') : null;
+          await db.from("user_data").upsert({
+            user_id: newUser.id,
+            phone: cleanPhone,
+            is_premium: false,
+            favorites: [],
+            hidden_ids: [],
+            been_there_ids: [],
+            closed_ids: [],
+            verify_ids: [],
+            manually_kept: [],
+          }, { onConflict: "user_id" });
+        }
+        onAuth(newUser);
+        const savedZip = localStorage.getItem("ff_last_zip");
+        if (savedZip) { setZip(savedZip); setTab("find"); handleZipSearch(savedZip); }
+        else { setTab("find"); }
+      }
+    } catch { setAuthError("Something went wrong. Try again."); }
+    setAuthLoading(false);
+  };
+
+  const isLoading = status === "locating" || status === "loading";
+  const inputStyle = { width:"100%", padding:"10px 12px", borderRadius:8, border:"1px solid var(--border)", background:"var(--bg)", color:"var(--text)", fontSize:14, outline:"none", fontFamily:"var(--ff-mono)", marginBottom:10 };
+
+  return (
+    <div style={{minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:20, padding:"32px 20px", background:"var(--bg)"}}>
+      <h1 style={{fontFamily:"'Playfair Display',Georgia,serif", fontSize:38, fontWeight:900, background:"linear-gradient(135deg,#2C1810 0%,#C4922A 100%)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", textAlign:"center"}}>Fade & Find</h1>
+      <p style={{fontFamily:"monospace", fontSize:11, color:"var(--muted)", letterSpacing:"0.15em", textTransform:"uppercase", marginTop:-12}}>Where forgotten things find new homes.</p>
+
+      <div style={{maxWidth:400, width:"100%", background:"var(--card-bg)", borderRadius:16, border:"1px solid var(--border)", overflow:"hidden"}}>
+        {/* Tabs */}
+        <div style={{display:"flex", borderBottom:"1px solid var(--border)"}}>
+          {[{key:"find", label:"🗺️ Find Near Me"}, {key:"account", label:"👤 Sign In"}].map(t => (
+            <button key={t.key} onClick={()=>setTab(t.key)} style={{flex:1, padding:"14px 8px", border:"none", background: tab===t.key ? "var(--card-bg)" : "var(--bg)", cursor:"pointer", fontFamily:"var(--ff-mono)", fontSize:12, fontWeight: tab===t.key ? 700 : 400, color: tab===t.key ? "var(--accent)" : "var(--muted)", borderBottom: tab===t.key ? `2px solid var(--accent)` : "2px solid transparent", transition:"all 0.2s"}}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{padding:24}}>
+          {tab === "find" && (
+            <>
+              <div style={{marginBottom:18}}>
+                <label style={{fontSize:11, fontFamily:"var(--ff-mono)", color:"var(--muted)", textTransform:"uppercase", letterSpacing:"0.1em", display:"block", marginBottom:8}}>Search radius: {radius} miles</label>
+                <input type="range" min={25} max={200} step={25} value={radius} onChange={e=>saveRadius(+e.target.value)} style={{width:"100%", accentColor:"var(--accent)"}}/>
+              </div>
+              <button onClick={handleUseLocation} disabled={isLoading} style={{width:"100%", padding:"13px", borderRadius:8, border:"none", background:"var(--accent)", color:"#F5EFE0", fontSize:14, fontWeight:700, cursor:isLoading?"default":"pointer", fontFamily:"'Playfair Display',Georgia,serif", marginBottom:12, opacity:isLoading?0.7:1}}>
+                {status==="locating" ? "📍 Getting location..." : status==="loading" ? "⏳ Loading listings..." : "📍 Use My Location"}
+              </button>
+              <p style={{textAlign:"center", fontSize:11, color:"var(--muted)", fontFamily:"var(--ff-mono)", marginBottom:10}}>— or enter a zip code —</p>
+              <div style={{display:"flex", gap:8}}>
+                <input type="text" placeholder="e.g. 68008" value={zip} onChange={e=>setZip(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleZipSearch()} disabled={isLoading} style={{...inputStyle, marginBottom:0, flex:1}}/>
+                <button onClick={()=>handleZipSearch()} disabled={isLoading||!zip.trim()} style={{padding:"10px 16px", borderRadius:8, border:"1px solid var(--accent)", background:"transparent", color:"var(--accent)", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"var(--ff-mono)"}}>Go</button>
+              </div>
+              {locError && <p style={{fontSize:12, color:"#C45A5A", marginTop:10, fontFamily:"var(--ff-mono)"}}>{locError}</p>}
+              {!user && <p style={{fontSize:11, color:"var(--muted)", fontFamily:"var(--ff-mono)", marginTop:14, textAlign:"center"}}>Browsing as guest — <span onClick={()=>setTab("account")} style={{color:"var(--accent)", cursor:"pointer", textDecoration:"underline"}}>sign in</span> to save favorites & routes.</p>}
+            </>
+          )}
+
+          {tab === "account" && (
+            <>
+              {user ? (
+                <div style={{textAlign:"center", padding:"16px 0"}}>
+                  <div style={{fontSize:32, marginBottom:12}}>✅</div>
+                  <p style={{fontSize:14, color:"var(--text)", fontFamily:"var(--ff-heading)", marginBottom:8}}>Signed in as</p>
+                  <p style={{fontSize:13, color:"var(--muted)", fontFamily:"var(--ff-mono)", marginBottom:20}}>{user.email}</p>
+                  <button onClick={()=>setTab("find")} style={{padding:"12px 28px", borderRadius:8, border:"none", background:"var(--accent)", color:"#F5EFE0", fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"var(--ff-heading)"}}>Find Listings →</button>
+                </div>
+              ) : (
+                <>
+                  <h3 style={{fontFamily:"var(--ff-heading)", fontSize:17, color:"var(--text)", marginBottom:16, textAlign:"center"}}>{authMode==="login" ? "Welcome back" : "Create your account"}</h3>
+                  <input type="email" placeholder="Email address" value={email} onChange={e=>setEmail(e.target.value)} style={inputStyle}/>
+                  <input type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()} style={inputStyle}/>
+                  {authMode === "signup" && (
+                    <>
+                      <input type="tel" placeholder="Phone number (for SMS route sharing)" value={phone} onChange={e=>setPhone(e.target.value)} style={inputStyle}/>
+                      <p style={{fontSize:10,color:"var(--muted)",fontFamily:"var(--ff-mono)",marginBottom:10,marginTop:-6}}>Optional · By providing your phone number, you agree to receive SMS messages from Fade & Find. Message and data rates may apply. We will never sell your information.</p>
+                    </>
+                  )}
+                  {authError && <p style={{fontSize:12, color:"#C45A5A", marginBottom:10, fontFamily:"var(--ff-mono)"}}>{authError}</p>}
+                  <button onClick={handleAuth} disabled={authLoading} style={{width:"100%", padding:"12px", borderRadius:8, border:"none", background:"var(--accent)", color:"#F5EFE0", fontSize:14, fontWeight:700, cursor:authLoading?"default":"pointer", fontFamily:"var(--ff-heading)", opacity:authLoading?0.7:1, marginBottom:12}}>
+                    {authLoading ? "Please wait..." : authMode==="login" ? "Sign In" : "Create Account"}
+                  </button>
+                  <p style={{textAlign:"center", fontSize:12, color:"var(--muted)", fontFamily:"var(--ff-mono)"}}>
+                    {authMode==="login" ? "New here? " : "Have an account? "}
+                    <span onClick={()=>{setAuthMode(authMode==="login"?"signup":"login"); setAuthError("");}} style={{color:"var(--accent)", cursor:"pointer", textDecoration:"underline"}}>
+                      {authMode==="login" ? "Create account" : "Sign in"}
+                    </span>
+                  </p>
+                  <p style={{textAlign:"center", marginTop:8}}>
+                    <span onClick={()=>setTab("find")} style={{fontSize:11, color:"var(--muted)", fontFamily:"var(--ff-mono)", cursor:"pointer", textDecoration:"underline"}}>Continue as guest instead</span>
+                  </p>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── MAIN APP ──────────────────────────────────────────
+function FadeAndFind() {
+  const [user,         setUser]          = useState(null);   // supabase user
+  const [authChecked,  setAuthChecked]   = useState(false);  // finished checking session
+  const [liveListings, setLiveListings]  = useState(null);
+  const [loadedFrom,   setLoadedFrom]    = useState("");
+  const [selectedId,   setSelectedId]    = useState(null);
+  const [favorites,    setFavorites]     = useState([]);
+  const [routeStops,   setRouteStops]    = useState([]);
+  const [routeMode,    setRouteMode]     = useState(false);
+  const [showFilters,  setShowFilters]   = useState(false);
+  const [activeTab,    setActiveTab]     = useState("map");
+  const [filters,      setFiltersRaw]    = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("ff_filters") || "null");
+      if (saved) return { ...{ categories: Object.keys(CATEGORIES), maxDistance: 200, sortBy: "distance", featuredOnly: false, tagSearch: "" }, ...saved };
+    } catch {}
+    return { categories: Object.keys(CATEGORIES), maxDistance: 200, sortBy: "distance", featuredOnly: false, tagSearch: "" };
+  });
+
+  const setFilters = (updater) => {
+    setFiltersRaw(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      try { localStorage.setItem("ff_filters", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+  const [alerts, setAlerts] = useState({ newEstates:true, auctionReminders:true, tagMatches:false });
+  const [searchText, setSearchText] = useState("");
+  const [mapBounds, setMapBounds] = useState(null);
+  const [manuallyKept, setManuallyKept] = useState(new Set());
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [closedIds,    setClosedIds]    = useState(new Set());
+  const [verifyIds,    setVerifyIds]    = useState(new Set());
+  const [beenThereIds, setBeenThereIds] = useState(new Set());
+  const [hiddenIds,    setHiddenIds]    = useState(new Set());
+  const [isPremium,    setIsPremium]    = useState(false);
+  const [appraiserUses, setAppraiserUses] = useState(0);
+  const [showAppraiser, setShowAppraiser] = useState(false);
+
+  // ── Check existing session on mount ──
+  useEffect(() => {
+    // Handle post-Stripe-checkout redirect
+    if (window.location.search.includes("upgraded=true")) {
+      window.history.replaceState({}, "", window.location.pathname);
+      setTimeout(() => setIsPremium(true), 500);
+    }
+    db.auth.getSession().then(({ data: { session } }) => {
+      const u = session?.user ?? null;
+      _currentUser = u;
+      setUser(u);
+      setAuthChecked(true);
+      // Auto-load for returning logged-in users with a saved zip
+      if (session?.user) {
+        const savedZip = localStorage.getItem("ff_last_zip");
+        const savedRadius = parseInt(localStorage.getItem("ff_radius") || "100");
+        if (savedZip) {
+          autoLoadZip(savedZip, savedRadius);
+        }
+      }
+    });
+    const { data: { subscription } } = db.auth.onAuthStateChange((_event, session) => {
+      const u = session?.user ?? null;
+      _currentUser = u;
+      setUser(u);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const autoLoadZip = async (zip, radius) => {
+    try {
+      const resp = await fetch(`https://nominatim.openstreetmap.org/search?q=${zip}&format=json&limit=1`, { headers: { "User-Agent": "FadeAndFind/1.0" } });
+      const results = await resp.json();
+      if (!results.length) return;
+      const lat = parseFloat(results[0].lat);
+      const lng = parseFloat(results[0].lon);
+      const latDelta = radius / 69;
+      const lngDelta = radius / 53;
+      const url = `${SUPA_URL}/rest/v1/listings?lat=gte.${lat - latDelta}&lat=lte.${lat + latDelta}&lng=gte.${lng - lngDelta}&lng=lte.${lng + lngDelta}&select=*&limit=500`;
+      const dbResp = await fetch(url, { headers: { "apikey": SUPA_KEY, "Authorization": `Bearer ${SUPA_KEY}` } });
+      if (!dbResp.ok) return;
+      const raw = await dbResp.json();
+      if (raw.length) setLiveListings(raw.map((r, i) => transformListing(r, i)));
+    } catch {}
+  };
+
+  // ── Load user data from Supabase when user logs in ──
+  useEffect(() => {
+    if (!user) return;
+    db.from("user_data").select("*").eq("user_id", user.id).single()
+      .then(({ data }) => {
+        if (data) {
+          setFavorites(data.favorites || []);
+          setHiddenIds(new Set(data.hidden_ids || []));
+          setBeenThereIds(new Set(data.been_there_ids || []));
+          setClosedIds(new Set(data.closed_ids || []));
+          setVerifyIds(new Set(data.verify_ids || []));
+          setManuallyKept(new Set(data.manually_kept || []));
+          setIsPremium(data.is_premium || false);
+          setAppraiserUses(data.appraiser_uses || 0);
+        }
+      });
+  }, [user]);
+
+  // ── Save user data to Supabase ──
+  const saveToSupabase = useCallback(async (patch) => {
+    if (!user) return;
+    const { data: existing } = await db.from("user_data").select("id").eq("user_id", user.id).single();
+    if (existing) {
+      await db.from("user_data").update({ ...patch, updated_at: new Date().toISOString() }).eq("user_id", user.id);
+    } else {
+      await db.from("user_data").insert({ user_id: user.id, ...patch });
+    }
+  }, [user]);
+
+  const markClosed = (id) => setClosedIds(prev => {
+    const next = new Set(prev); next.add(id);
+    saveToSupabase({ closed_ids: [...next] });
+    return next;
+  });
+  const markVerify = (id) => setVerifyIds(prev => {
+    const next = new Set(prev); next.add(id);
+    saveToSupabase({ verify_ids: [...next] });
+    return next;
+  });
+  const clearStatus = (id) => {
+    setClosedIds(prev => { const next = new Set(prev); next.delete(id); saveToSupabase({ closed_ids: [...next] }); return next; });
+    setVerifyIds(prev => { const next = new Set(prev); next.delete(id); saveToSupabase({ verify_ids: [...next] }); return next; });
+  };
+  const toggleBeenThere = (id) => setBeenThereIds(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    saveToSupabase({ been_there_ids: [...next] });
+    return next;
+  });
+  const hideId = (id) => setHiddenIds(prev => {
+    const next = new Set(prev); next.add(id);
+    saveToSupabase({ hidden_ids: [...next] });
+    return next;
+  });
+  const unhideId = (id) => setHiddenIds(prev => {
+    const next = new Set(prev); next.delete(id);
+    saveToSupabase({ hidden_ids: [...next] });
+    return next;
+  });
+  const toggleFavoriteWithSync = (id) => {
+    setFavorites(prev => {
+      const next = prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id];
+      saveToSupabase({ favorites: next });
+      return next;
+    });
+  };
+
+  const cssVars = {
+    "--bg":"#F5EFE0","--card-bg":"#EDE5D0","--card-active":"#E4D9C0",
+    "--text":"#2C1810","--muted":"#8A7A65","--accent":"#C4922A",
+    "--accent-bg":"#C4922A18","--border":"#D4C4A8","--grid":"#E8DECE",
+    "--map-bg":"linear-gradient(135deg,#F0E8D4 0%,#EDE5D0 50%,#F5EFE0 100%)",
+    "--tag-bg":"#E8DECE","--tag-text":"#6A5A42",
+    "--ff-heading":"'Playfair Display',Georgia,serif",
+    "--ff-body":"'Source Sans 3','Source Sans Pro',system-ui,sans-serif",
+    "--ff-mono":"'JetBrains Mono','Fira Code',monospace",
+    fontFamily:"var(--ff-body)",background:"var(--bg)",color:"var(--text)",minHeight:"100vh",position:"relative",
+  };
+
+  // Show loading spinner while checking auth
+  if (!authChecked) {
+    return (
+      <div style={{...cssVars, display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh"}}>
+        <p style={{fontFamily:"var(--ff-mono)", color:"var(--muted)", fontSize:12, letterSpacing:"0.1em"}}>Loading...</p>
+      </div>
+    );
+  }
+
+  // Guest mode — no hard wall, just limited features
+  const isGuest = !user;
+
+  // Show combined location + auth screen until listings are loaded
+  if (liveListings === null) {
+    return (
+      <div style={cssVars}>
+        <StartScreen
+          user={user}
+          onLoad={(listings, label) => { setLiveListings(listings); setLoadedFrom(label); }}
+          onAuth={setUser}
+        />
+      </div>
+    );
+  }
+
+  const handleUnflag = (id) => setManuallyKept(prev => new Set([...prev, id]));
+
+  // Flagged listings: auto-filtered but shown as dismissible warnings (unless user kept them)
+  const flaggedInView = liveListings.filter(l => {
+    if (!l.flagged || manuallyKept.has(l.id)) return false;
+    if (!mapBounds || !l.lat || !l.lng) return true;
+    return l.lat <= mapBounds.north && l.lat >= mapBounds.south &&
+           l.lng <= mapBounds.east  && l.lng >= mapBounds.west;
+  });
+
+  // Normal listings: not flagged (or manually kept), not hidden, pass all filters
+  const filteredListings = liveListings
+    .filter(l => !l.flagged || manuallyKept.has(l.id))
+    .filter(l => !hiddenIds.has(l.id))
+    .filter(l => filters.categories.includes(l.category))
+    .filter(l => l.distance <= filters.maxDistance)
+    .filter(l => !filters.featuredOnly || l.featured)
+    .filter(l => {
+      if (!filters.tagSearch) return true;
+      const terms = filters.tagSearch.toLowerCase().split(",").map(t=>t.trim());
+      return terms.some(t => l.tags.some(tag=>tag.includes(t)) || l.name.toLowerCase().includes(t));
+    })
+    .filter(l => {
+      if (!searchText) return true;
+      const s = searchText.toLowerCase();
+      return l.name.toLowerCase().includes(s) || l.address.toLowerCase().includes(s);
+    })
+    .filter(l => {
+      if (!mapBounds || !l.lat || !l.lng) return true;
+      return l.lat <= mapBounds.north && l.lat >= mapBounds.south &&
+             l.lng <= mapBounds.east  && l.lng >= mapBounds.west;
+    })
+    .sort((a,b) => {
+      if (filters.sortBy==="distance") return a.distance - b.distance;
+      if (filters.sortBy==="rating")   return (b.rating||0) - (a.rating||0);
+      return 0;
+    });
+
+  const favoriteListings = liveListings.filter(l => favorites.includes(l.id));
+  const toggleFavorite   = isGuest ? ()=>setShowAuthModal(true) : toggleFavoriteWithSync;
+  const toggleRouteStop  = (id) => { setRouteStops(s => s.includes(id) ? s.filter(x=>x!==id) : [...s,id]); if (!routeMode) setRouteMode(true); };
+  const userInitial = user?.email?.[0]?.toUpperCase() || "?";
+
+  return (
+    <div style={cssVars}>
+
+      {/* ── Auth Modal ── */}
+      {showAuthModal && (
+        <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(44,24,16,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div style={{background:"var(--bg)",borderRadius:14,padding:4,width:"100%",maxWidth:400,position:"relative",boxShadow:"0 8px 40px rgba(0,0,0,0.2)"}}>
+            <button onClick={()=>setShowAuthModal(false)} style={{position:"absolute",top:12,right:12,width:28,height:28,borderRadius:"50%",border:"1px solid var(--border)",background:"var(--card-bg)",cursor:"pointer",fontSize:14,color:"var(--muted)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1}}>✕</button>
+            <AuthScreen onAuth={(u)=>{ setShowAuthModal(false); setUser(u); }}/>
+          </div>
+        </div>
+      )}
+
+      {/* ── Guest banner ── */}
+      {!user && (
+        <div style={{background:"var(--accent)",padding:"8px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,transition:"all 0.3s ease"}}>
+          <span style={{fontSize:12,color:"#F5EFE0",fontFamily:"var(--ff-mono)"}}>👋 You're browsing as a guest — favorites & routes won't be saved.</span>
+          <button onClick={()=>setShowAuthModal(true)} style={{fontSize:11,fontWeight:700,color:"var(--accent)",background:"#F5EFE0",border:"none",borderRadius:4,padding:"4px 10px",cursor:"pointer",fontFamily:"var(--ff-mono)",whiteSpace:"nowrap"}}>Sign Up Free</button>
+        </div>
+      )}
+
+      {/* ── Header ── */}
+      <header style={{padding:"16px 20px 12px",position:"relative",zIndex:10,borderBottom:"1px solid var(--border)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <div>
+            <h1 style={{fontFamily:"var(--ff-heading)",fontSize:26,fontWeight:900,margin:0,letterSpacing:"-0.02em",background:"linear-gradient(135deg,#2C1810 0%,#C4922A 100%)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Fade & Find</h1>
+            <p style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"var(--muted)",letterSpacing:"0.15em",textTransform:"uppercase",marginTop:2}}>Where forgotten things find new homes.</p>
+            <p style={{fontSize:9,fontFamily:"var(--ff-mono)",color:"#3A7A3A",letterSpacing:"0.1em",textTransform:"uppercase",marginTop:2}}>
+              ● Live · {liveListings.length} listings · {loadedFrom}
+            </p>
+          </div>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            <div onClick={()=>{ if(!user){setShowAuthModal(true);return;} setShowAppraiser(true); }} title="The Appraiser" style={{width:36,height:36,borderRadius:8,background:"var(--card-bg)",border:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,cursor:"pointer",position:"relative"}}>
+              📸
+              {!isPremium && appraiserUses >= 2 && <span style={{position:"absolute",top:-4,right:-4,width:14,height:14,borderRadius:"50%",background:"#C4922A",color:"#F5EFE0",fontSize:8,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>★</span>}
+            </div>
+            {!user ? (
+              <button onClick={()=>setShowAuthModal(true)} style={{height:36,padding:"0 12px",borderRadius:18,background:"var(--accent)",border:"none",color:"#F5EFE0",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"var(--ff-mono)",whiteSpace:"nowrap"}}>Sign In</button>
+            ) : (
+              <div
+                title={`Signed in as ${user?.email}\nClick to sign out`}
+                onClick={async()=>{ if(window.confirm("Sign out?")){ await db.auth.signOut(); setUser(null); }}}
+                style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#C4922A,#8B6F47)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:"#F5EFE0",cursor:"pointer"}}
+              >{userInitial}</div>
+            )}
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <div style={{flex:1,display:"flex",alignItems:"center",gap:8,padding:"0 12px",height:38,borderRadius:8,background:"var(--card-bg)",border:"1px solid var(--border)"}}>
+            <span style={{fontSize:14,opacity:.5}}>🔍</span>
+            <input type="text" value={searchText} onChange={e=>setSearchText(e.target.value)} placeholder="Search sales, stores, tags..." style={{flex:1,border:"none",background:"transparent",outline:"none",color:"var(--text)",fontSize:13}}/>
+          </div>
+          <button onClick={()=>setShowFilters(true)} style={{width:38,height:38,borderRadius:8,border:"1px solid var(--border)",background:"var(--card-bg)",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>⚙️</button>
+          <button onClick={()=>setLiveListings(null)} title="Change location" style={{width:38,height:38,borderRadius:8,border:"1px solid var(--border)",background:"var(--card-bg)",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>📍</button>
+        </div>
+      </header>
+
+      {/* ── Tabs ── */}
+      <nav style={{display:"flex",borderBottom:"1px solid var(--border)",position:"relative",zIndex:10}}>
+        {[{key:"map",label:"Map",icon:"🗺️"},{key:"favorites",label:"Saved",icon:"❤️",count:favorites.length},{key:"groups",label:"Groups",icon:"👥"},{key:"alerts",label:"Alerts",icon:"🔔"}].map(tab=>(
+          <button key={tab.key} onClick={()=>setActiveTab(tab.key)} style={{flex:1,padding:"10px 0",border:"none",background:"transparent",cursor:"pointer",color:activeTab===tab.key?"var(--accent)":"var(--muted)",borderBottom:activeTab===tab.key?"2px solid var(--accent)":"2px solid transparent",fontFamily:"var(--ff-mono)",fontSize:11,textTransform:"uppercase",letterSpacing:"0.08em",display:"flex",alignItems:"center",justifyContent:"center",gap:4,transition:"all 0.2s"}}>
+            <span>{tab.icon}</span>{tab.label}
+            {tab.count>0 && <span style={{background:"var(--accent)",color:"var(--bg)",width:16,height:16,borderRadius:"50%",fontSize:9,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>{tab.count}</span>}
+          </button>
+        ))}
+      </nav>
+
+      {/* ── Content ── */}
+      <div style={{position:"relative",zIndex:5}}>
+
+        {activeTab==="map" && (
+          <div style={{animation:"fadeIn 0.3s ease"}}>
+            <div style={{padding:"12px 16px 0"}}>
+              <MapView allListings={liveListings} visibleIds={new Set(filteredListings.map(l=>l.id))} selectedId={selectedId} onSelect={setSelectedId} routeMode={routeMode} routeStops={routeStops} onBoundsChange={setMapBounds}/>
+            </div>
+            {routeStops.length>0 && (
+              <div style={{padding:"12px 16px 0"}}>
+                <PremiumGate isPremium={isPremium} isGuest={isGuest} feature="Route Optimization" onSignUp={()=>setShowAuthModal(true)} user={user}>
+                  <RoutePanel stops={routeStops} listings={liveListings} onRemove={id=>setRouteStops(s=>s.filter(x=>x!==id))} onClear={()=>{setRouteStops([]);setRouteMode(false);}} onReorder={setRouteStops}/>
+                </PremiumGate>
+              </div>
+            )}
+            <div style={{padding:"12px 16px 4px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <span style={{fontSize:11,fontFamily:"var(--ff-mono)",color:"var(--muted)"}}>{filteredListings.length} listing{filteredListings.length!==1?"s":""} in view</span>
+                {hiddenIds.size > 0 && (
+                  <button onClick={()=>{if(window.confirm(`Restore all ${hiddenIds.size} hidden listing${hiddenIds.size!==1?"s":""}?`)){[...hiddenIds].forEach(unhideId);}}} style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"var(--muted)",background:"none",border:"1px solid var(--border)",borderRadius:4,padding:"1px 7px",cursor:"pointer"}}>
+                    👻 {hiddenIds.size} hidden
+                  </button>
+                )}
+              </div>
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                {filters.maxDistance<200 && <span style={{fontSize:10,fontFamily:"var(--ff-mono)",color:"var(--accent)",background:"var(--accent-bg)",padding:"2px 8px",borderRadius:4}}>within {filters.maxDistance}mi</span>}
+              </div>
+            </div>
+            <div style={{padding:"4px 16px 100px"}}>
+              {filteredListings.map(l=>(
+                <ListingCard key={l.id} listing={l} isSelected={selectedId===l.id} isFavorite={favorites.includes(l.id)} isRouteStop={routeStops.includes(l.id)} routeIndex={routeStops.indexOf(l.id)} onSelect={setSelectedId} onFavorite={toggleFavorite} onAddRoute={toggleRouteStop} onUnflag={handleUnflag} isClosed={closedIds.has(l.id)} isVerify={verifyIds.has(l.id)} onMarkClosed={markClosed} onMarkVerify={markVerify} onClearStatus={clearStatus} isBeenThere={beenThereIds.has(l.id)} onToggleBeenThere={toggleBeenThere} onHide={hideId} isGuest={isGuest} onSignUp={()=>setShowAuthModal(true)}/>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab==="favorites" && (
+          <div style={{padding:"16px",animation:"fadeIn 0.3s ease"}}>
+            <h3 style={{fontFamily:"var(--ff-heading)",fontSize:18,marginBottom:12,color:"var(--text)"}}>Saved Listings</h3>
+            {isGuest ? (
+              <div style={{textAlign:"center",padding:"32px 16px"}}>
+                <div style={{fontSize:32,marginBottom:12}}>❤️</div>
+                <p style={{fontSize:14,color:"var(--text)",marginBottom:8,fontFamily:"var(--ff-heading)"}}>Save your favorites</p>
+                <p style={{fontSize:12,color:"var(--muted)",marginBottom:20,fontFamily:"var(--ff-body)"}}>Create a free account to save listings and access them on any device.</p>
+                <button onClick={()=>setShowAuthModal(true)} style={{padding:"10px 24px",borderRadius:8,border:"none",background:"var(--accent)",color:"#F5EFE0",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"var(--ff-heading)"}}>Create Free Account</button>
+              </div>
+            ) : favoriteListings.length===0 ? (
+              <p style={{color:"var(--muted)",fontSize:13}}>No saved listings yet. Tap ❤️ on any listing.</p>
+            ) : favoriteListings.map(l=>(
+              <ListingCard key={l.id} listing={l} isSelected={selectedId===l.id} isFavorite={true} isRouteStop={routeStops.includes(l.id)} routeIndex={routeStops.indexOf(l.id)} onSelect={setSelectedId} onFavorite={toggleFavorite} onAddRoute={toggleRouteStop} onUnflag={handleUnflag} isClosed={closedIds.has(l.id)} isVerify={verifyIds.has(l.id)} onMarkClosed={markClosed} onMarkVerify={markVerify} onClearStatus={clearStatus} isBeenThere={beenThereIds.has(l.id)} onToggleBeenThere={toggleBeenThere} onHide={hideId} isGuest={isGuest} onSignUp={()=>setShowAuthModal(true)}/>
+            ))}
+          </div>
+        )}
+
+        {activeTab==="groups" && (
+          <div style={{padding:"16px",animation:"fadeIn 0.3s ease"}}>
+            <PremiumGate isPremium={isPremium} isGuest={isGuest} feature="Group Sharing" onSignUp={()=>setShowAuthModal(true)} user={user}>
+              <GroupPanel routeStops={routeStops} listings={liveListings}/>
+            </PremiumGate>
+          </div>
+        )}
+
+        {activeTab==="alerts" && (
+          <div style={{padding:"16px",animation:"fadeIn 0.3s ease"}}>
+            <PremiumGate isPremium={isPremium} isGuest={isGuest} feature="Listing Alerts" onSignUp={()=>setShowAuthModal(true)} user={user}>
+              <AlertPanel alerts={alerts} setAlerts={setAlerts}/>
+            </PremiumGate>
+          </div>
+        )}
+      </div>
+
+      {showFilters && <FilterPanel filters={filters} setFilters={setFilters} onClose={()=>setShowFilters(false)} flaggedListings={liveListings.filter(l=>l.flagged && !manuallyKept.has(l.id))} onUnflag={handleUnflag}/>}
+      {showAppraiser && <AppraiserModal user={user} isPremium={isPremium} appraiserUses={appraiserUses} setAppraiserUses={setAppraiserUses} onClose={()=>setShowAppraiser(false)} onUpgrade={()=>{setShowAppraiser(false);}} saveToSupabase={saveToSupabase}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<FadeAndFind/>);
+</script>
 </body>
 </html>
