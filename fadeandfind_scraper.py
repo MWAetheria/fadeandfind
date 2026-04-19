@@ -244,14 +244,71 @@ def parse_container(container_text):
     return fields
 
 
+
+def scrape_estatesales_detail(url, session=None):
+    """Fetch individual estate sale listing page and extract full street address."""
+    try:
+        requester = session or requests
+        resp = requester.get(url, headers=HEADERS, timeout=20)
+        if resp.status_code != 200:
+            return ""
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        # Method 1: Look for structured address in schema.org JSON-LD
+        for script in soup.find_all("script", type="application/ld+json"):
+            try:
+                import json
+                data = json.loads(script.string)
+                if isinstance(data, list):
+                    data = data[0]
+                addr = data.get("location", {}).get("address", {})
+                if not addr:
+                    addr = data.get("address", {})
+                street = addr.get("streetAddress", "")
+                if street:
+                    return street.strip()
+            except Exception:
+                pass
+
+        # Method 2: Look for address in common estatesales.net HTML patterns
+        for selector in [
+            "[itemprop='streetAddress']",
+            "[class*='address']",
+            "[class*='location']",
+            ".sale-address",
+            "#sale-address",
+        ]:
+            el = soup.select_one(selector)
+            if el:
+                text = el.get_text(strip=True)
+                if re.match(r'^\d+\s+', text):
+                    return text.strip()
+
+        # Method 3: Regex scan the full page text for a street address
+        page_text = soup.get_text(separator=" ", strip=True)
+        addr_match = re.search(
+            r'(\d+\s+(?:[NSEW]\.?\s+)?[A-Za-z0-9][A-Za-z0-9\s\.\-]*?'
+            r'(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd|Way|Court|Ct|' 
+            r'Place|Pl|Terrace|Ter|Trail|Trl|Circle|Cir|Pike|Hwy|Highway|'
+            r'\d+(?:st|nd|rd|th)\s+(?:Street|St|Ave|Avenue|Terrace|Ter|Road|Rd|Drive|Dr|Court|Ct|Place|Pl|Blvd|Lane|Ln))\.?)',
+            page_text, re.IGNORECASE
+        )
+        if addr_match:
+            return addr_match.group(1).strip()
+
+    except Exception:
+        pass
+    return ""
+
+
 def scrape_estatesales(state, city, zip_code):
     url = f"https://www.estatesales.net/{state}/{city}/{zip_code}"
-    print(f"  🌐 EstateSales: {url}")
+    print(f"  \U0001f310 EstateSales: {url}")
     listings = []
     try:
         resp = requests.get(url, headers=HEADERS, timeout=20)
         if resp.status_code != 200:
-            print(f"     ⚠️  Status {resp.status_code}")
+            print(f"     \u26a0\ufe0f  Status {resp.status_code}")
             return listings
         soup = BeautifulSoup(resp.text, "html.parser")
         sale_links = []
@@ -272,13 +329,14 @@ def scrape_estatesales(state, city, zip_code):
             sale_id = link["sale_id"]
             raw_name = a_tag.get_text(separator=" ", strip=True)
             name = clean_name(raw_name)
+            detail_url = f"https://www.estatesales.net{link['href']}"
             listing = {
                 "id":         f"es_{sale_id}",
                 "name":       name,
                 "city":       link["sale_city"].replace("-", " ").title(),
                 "state":      link["sale_state"],
                 "zip":        link["sale_zip"],
-                "url":        f"https://www.estatesales.net{link['href']}",
+                "url":        detail_url,
                 "lat":        None, "lng": None,
                 "address":    "", "distance": "", "photo_count": 0,
                 "dates":      "", "times": "", "company": "",
@@ -299,15 +357,23 @@ def scrape_estatesales(state, city, zip_code):
                 container_text = a_tag.parent.get_text(separator=" | ", strip=True) if a_tag.parent else ""
             parsed = parse_container(container_text)
             listing.update(parsed)
+
+            # If no street address found in grid, fetch the detail page
+            if not listing.get("address") or not re.match(r'^\d+\s+', listing.get("address", "")):
+                print(f"     \U0001f50d Fetching detail for: {name[:45]}")
+                street = scrape_estatesales_detail(detail_url)
+                if street:
+                    listing["address"] = street
+                    print(f"         \u2713 Got address: {street}")
+                time.sleep(1.5)
+
             if "auction" in container_text.lower() or "auction" in name.lower():
                 listing["category"] = "auction"
             listings.append(listing)
     except Exception as e:
-        print(f"     ❌ Error: {e}")
+        print(f"     \u274c Error: {e}")
     return listings
 
-
-# ══════════════════════════════════════════════════════════
 # AUCTIONZIP SCRAPER
 # ══════════════════════════════════════════════════════════
 
@@ -752,137 +818,12 @@ def main():
         city_url = city.replace(" ", "-")
 
         # Estate sales
-      def scrape_estatesales_detail(url, session=None):
-    """Fetch individual estate sale listing page and extract full street address."""
-    try:
-        requester = session or requests
-        resp = requester.get(url, headers=HEADERS, timeout=20)
-        if resp.status_code != 200:
-            return ""
-        soup = BeautifulSoup(resp.text, "html.parser")
-
-        # Method 1: Look for structured address in schema.org JSON-LD
-        for script in soup.find_all("script", type="application/ld+json"):
-            try:
-                import json
-                data = json.loads(script.string)
-                if isinstance(data, list):
-                    data = data[0]
-                addr = data.get("location", {}).get("address", {})
-                if not addr:
-                    addr = data.get("address", {})
-                street = addr.get("streetAddress", "")
-                if street:
-                    return street.strip()
-            except Exception:
-                pass
-
-        # Method 2: Look for address in common estatesales.net HTML patterns
-        # They often put it in a div with "address" in class or itemprop
-        for selector in [
-            "[itemprop='streetAddress']",
-            "[class*='address']",
-            "[class*='location']",
-            ".sale-address",
-            "#sale-address",
-        ]:
-            el = soup.select_one(selector)
-            if el:
-                text = el.get_text(strip=True)
-                # Validate it looks like a real street address (starts with number)
-                if re.match(r'^\d+\s+', text):
-                    return text.strip()
-
-        # Method 3: Regex scan the full page text for a street address
-        page_text = soup.get_text(separator=" ", strip=True)
-        addr_match = re.search(
-            r'(\d+\s+(?:[NSEW]\.?\s+)?[A-Za-z0-9][A-Za-z0-9\s\.\-]*?'
-            r'(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd|Way|Court|Ct|'
-            r'Place|Pl|Terrace|Ter|Trail|Trl|Circle|Cir|Pike|Hwy|Highway|'
-            r'\d+(?:st|nd|rd|th)\s+(?:Street|St|Ave|Avenue|Terrace|Ter|Road|Rd|Drive|Dr|Court|Ct|Place|Pl|Blvd|Lane|Ln))\.?)',
-            page_text, re.IGNORECASE
-        )
-        if addr_match:
-            return addr_match.group(1).strip()
-
-    except Exception as e:
-        pass
-    return ""
-
-
-def scrape_estatesales(state, city, zip_code):
-    url = f"https://www.estatesales.net/{state}/{city}/{zip_code}"
-    print(f"  🌐 EstateSales: {url}")
-    listings = []
-    try:
-        resp = requests.get(url, headers=HEADERS, timeout=20)
-        if resp.status_code != 200:
-            print(f"     ⚠️  Status {resp.status_code}")
-            return listings
-        soup = BeautifulSoup(resp.text, "html.parser")
-        sale_links = []
-        seen_ids = set()
-        for a_tag in soup.find_all("a", href=True):
-            href = a_tag.get("href", "")
-            match = SALE_LINK_PATTERN.match(href)
-            if match:
-                sale_id = match.group(4)
-                if sale_id not in seen_ids:
-                    seen_ids.add(sale_id)
-                    sale_links.append({"element": a_tag, "href": href,
-                                       "sale_state": match.group(1), "sale_city": match.group(2),
-                                       "sale_zip": match.group(3), "sale_id": sale_id})
-        print(f"     Found {len(sale_links)} listings")
-        for link in sale_links:
-            a_tag   = link["element"]
-            sale_id = link["sale_id"]
-            raw_name = a_tag.get_text(separator=" ", strip=True)
-            name = clean_name(raw_name)
-            detail_url = f"https://www.estatesales.net{link['href']}"
-            listing = {
-                "id":         f"es_{sale_id}",
-                "name":       name,
-                "city":       link["sale_city"].replace("-", " ").title(),
-                "state":      link["sale_state"],
-                "zip":        link["sale_zip"],
-                "url":        detail_url,
-                "lat":        None, "lng": None,
-                "address":    "", "distance": "", "photo_count": 0,
-                "dates":      "", "times": "", "company": "",
-                "status":     "", "category": "estate",
-                "source":     "estatesales.net",
-                "scraped_at": datetime.now(timezone.utc).isoformat(),
-            }
-            container = a_tag
-            container_text = ""
-            for _ in range(12):
-                if container.parent:
-                    container = container.parent
-                    text = container.get_text(separator=" | ", strip=True)
-                    if bool(re.search(r'\d{5}', text)) and bool(re.search(r'miles?\s*away|Pictures?|Listed\s*by', text, re.IGNORECASE)) and len(text) > 100:
-                        container_text = text
-                        break
-            if not container_text:
-                container_text = a_tag.parent.get_text(separator=" | ", strip=True) if a_tag.parent else ""
-            parsed = parse_container(container_text)
-            listing.update(parsed)
-
-            # If no street address found in grid, fetch the detail page
-            if not listing.get("address") or not re.match(r'^\d+\s+', listing.get("address", "")):
-                print(f"     🔍 Fetching detail for: {name[:45]}")
-                street = scrape_estatesales_detail(detail_url)
-                if street:
-                    listing["address"] = street
-                    print(f"         ✓ Got address: {street}")
-                time.sleep(1.5)  # be polite to estatesales.net
-
-            if "auction" in container_text.lower() or "auction" in name.lower():
-                listing["category"] = "auction"
-            listings.append(listing)
-    except Exception as e:
-        print(f"     ❌ Error: {e}")
-    return listings
-
+        es = scrape_estatesales(state, city_url, zip_code)
+        es = geocode_listings(es, origin_lat, origin_lng, radius)
+        for l in es:
+            if l["id"] not in seen_ids:
+                seen_ids.add(l["id"])
+                all_listings.append(l)
 
         # AuctionZip — scrape matching state
         az = scrape_auctionzip([state.lower()], origin_lat, origin_lng, radius)
