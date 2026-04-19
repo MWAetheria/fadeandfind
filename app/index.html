@@ -680,12 +680,17 @@ function optimizeRoute(listings) {
 function buildGoogleMapsUrl(listings) {
   const valid = listings.filter(l => l.lat && l.lng);
   if (!valid.length) return null;
+
+  const toParam = (l) => l.address && l.address.trim() && l.address !== ", "
+    ? encodeURIComponent(l.address)
+    : `${l.lat},${l.lng}`;
+
   if (valid.length === 1) {
-    return `https://www.google.com/maps/dir/?api=1&destination=${valid[0].lat},${valid[0].lng}`;
+    return `https://www.google.com/maps/dir/?api=1&destination=${toParam(valid[0])}`;
   }
-  const origin      = `${valid[0].lat},${valid[0].lng}`;
-  const destination = `${valid[valid.length-1].lat},${valid[valid.length-1].lng}`;
-  const waypoints   = valid.slice(1, -1).map(l => `${l.lat},${l.lng}`).join("|");
+  const origin      = toParam(valid[0]);
+  const destination = toParam(valid[valid.length - 1]);
+  const waypoints   = valid.slice(1, -1).map(toParam).join("|");
   let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
   if (waypoints) url += `&waypoints=${encodeURIComponent(waypoints)}`;
   return url;
