@@ -1,10 +1,11 @@
 name: Fade & Find Scraper
 
 on:
-  schedule:
-    - cron: '5 14 * * 5'
-    - cron: '5 14 * * 6'
-    - cron: '5 14 * * 0'
+ schedule:
+    - cron: '5 14 * * 4'   # Thursday 9:05am CT (daily)
+    - cron: '5 14 * * 5'   # Friday 9:05am CT (daily)
+    - cron: '5 14 * * 6'   # Saturday 9:05am CT (daily)
+    - cron: '5 14 * * 0'   # Sunday 9:05am CT (daily) 
   workflow_dispatch:
     inputs:
       mode:
@@ -37,13 +38,11 @@ jobs:
       - name: Determine mode
         id: mode
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
-          elif [ "$(date +%u)" = "5" ]; then
-            echo "mode=full" >> $GITHUB_OUTPUT
           else
             echo "mode=daily" >> $GITHUB_OUTPUT
-          fi
+          fi 
 
       - name: Run scraper
         env:
