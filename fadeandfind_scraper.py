@@ -51,7 +51,6 @@ LISTING_PATTERN   = re.compile(r'/listings/(\d+)\.html', re.IGNORECASE)
 
 # ── US Metro areas to scrape ───────────────────────────────
 # Format: (state, city_url, zip, radius_miles)
-# Covers all major US metros + mid-size cities
 US_METROS = [
     # Midwest
     ("NE", "Blair",         "68008", 150),
@@ -146,7 +145,6 @@ PLACES_SEARCHES = [
     ("flea market",      "flea"),
     ("consignment shop", "thrift"),
     ("vintage shop",     "antique"),
-    # Note: auction house intentionally excluded (not event-based)
 ]
 
 
@@ -244,71 +242,132 @@ def parse_container(container_text):
     return fields
 
 
-
 def scrape_estatesales_detail(url, session=None):
-    """Fetch individual estate sale listing page and extract full street address."""
+    """
+    Fetch individual estate sale listing page.
+    Returns (street_address, dates_string) — both may be empty strings on failure.
+    Extracts dates from the detail page since the grid page rarely exposes them.
+    """
     try:
         requester = session or requests
         resp = requester.get(url, headers=HEADERS, timeout=20)
         if resp.status_code != 200:
-            return ""
+            return "", ""
         soup = BeautifulSoup(resp.text, "html.parser")
+        street = ""
+        dates  = ""
 
-        # Method 1: Look for structured address in schema.org JSON-LD
+        # ── Address ──────────────────────────────────────────────────────────
+
+        # Method 1: schema.org JSON-LD
         for script in soup.find_all("script", type="application/ld+json"):
             try:
-                import json
                 data = json.loads(script.string)
                 if isinstance(data, list):
                     data = data[0]
-                addr = data.get("location", {}).get("address", {})
-                if not addr:
-                    addr = data.get("address", {})
-                street = addr.get("streetAddress", "")
-                if street:
-                    return street.strip()
+                addr = data.get("location", {}).get("address", {}) or data.get("address", {})
+                s = addr.get("streetAddress", "")
+                if s:
+                    street = s.strip()
+                    break
             except Exception:
                 pass
 
-        # Method 2: Look for address in common estatesales.net HTML patterns
-        for selector in [
-            "[itemprop='streetAddress']",
-            "[class*='address']",
-            "[class*='location']",
-            ".sale-address",
-            "#sale-address",
-        ]:
-            el = soup.select_one(selector)
-            if el:
-                text = el.get_text(strip=True)
-                if re.match(r'^\d+\s+', text):
-                    return text.strip()
+        # Method 2: HTML selectors
+        if not street:
+            for selector in [
+                "[itemprop='streetAddress']",
+                "[class*='address']",
+                "[class*='location']",
+                ".sale-address",
+                "#sale-address",
+            ]:
+                el = soup.select_one(selector)
+                if el:
+                    t = el.get_text(strip=True)
+                    if re.match(r'^\d+\s+', t):
+                        street = t.strip()
+                        break
 
-        # Method 3: Regex scan the full page text for a street address
+        # Method 3: regex scan full page text
+        if not street:
+            page_text = soup.get_text(separator=" ", strip=True)
+            m = re.search(
+                r'(\d+\s+(?:[NSEW]\.?\s+)?[A-Za-z0-9][A-Za-z0-9\s\.\-]*?'
+                r'(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd|Way|'
+                r'Court|Ct|Place|Pl|Terrace|Ter|Trail|Trl|Circle|Cir|'
+                r'\d+(?:st|nd|rd|th)\s+(?:St|Ave|Rd|Dr|Ct|Pl|Blvd|Ln))\.?)',
+                page_text, re.IGNORECASE
+            )
+            if m:
+                street = m.group(1).strip()
+
+        # ── Dates ────────────────────────────────────────────────────────────
         page_text = soup.get_text(separator=" ", strip=True)
-        addr_match = re.search(
-            r'(\d+\s+(?:[NSEW]\.?\s+)?[A-Za-z0-9][A-Za-z0-9\s\.\-]*?'
-            r'(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd|Way|Court|Ct|' 
-            r'Place|Pl|Terrace|Ter|Trail|Trl|Circle|Cir|Pike|Hwy|Highway|'
-            r'\d+(?:st|nd|rd|th)\s+(?:Street|St|Ave|Avenue|Terrace|Ter|Road|Rd|Drive|Dr|Court|Ct|Place|Pl|Blvd|Lane|Ln))\.?)',
-            page_text, re.IGNORECASE
-        )
-        if addr_match:
-            return addr_match.group(1).strip()
+
+        # Method 1: JSON-LD startDate / endDate (most reliable)
+        for script in soup.find_all("script", type="application/ld+json"):
+            try:
+                data = json.loads(script.string)
+                if isinstance(data, list):
+                    data = data[0]
+                start = data.get("startDate", "")
+                end   = data.get("endDate", "")
+                # Use end date for expiry; fall back to start if no end
+                date_str = end if end else start
+                if date_str:
+                    try:
+                        d = datetime.fromisoformat(date_str[:10])
+                        dates = d.strftime("%b %d")
+                    except Exception:
+                        dates = date_str[:10]
+                    break
+            except Exception:
+                pass
+
+        # Method 2: visible date elements (EstateSales.NET renders day boxes)
+        if not dates:
+            # Look for date boxes like "Apr 18" / "Apr 19"
+            date_els = soup.select("[class*='date'], [class*='day'], time")
+            found_dates = []
+            for el in date_els:
+                t = el.get_text(strip=True)
+                dm = re.search(
+                    r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2})',
+                    t, re.IGNORECASE
+                )
+                if dm:
+                    found_dates.append(dm.group(1).strip())
+            if found_dates:
+                # Store as "Apr 18 to Apr 19" or just "Apr 18"
+                unique = list(dict.fromkeys(found_dates))  # dedupe, preserve order
+                dates = " to ".join(unique) if len(unique) > 1 else unique[0]
+
+        # Method 3: regex on full page text
+        if not dates:
+            date_m = re.search(
+                r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}'
+                r'(?:[,\s]+\d{1,2})*'
+                r'(?:\s*(?:to|-)\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2})?)',
+                page_text, re.IGNORECASE
+            )
+            if date_m:
+                dates = date_m.group(1).strip().rstrip(",")
 
     except Exception:
         pass
-    return ""
+
+    return street, dates
 
 
 def scrape_estatesales(state, city, zip_code):
     url = f"https://www.estatesales.net/{state}/{city}/{zip_code}"
-    print(f"  \U0001f310 EstateSales: {url}")
+    print(f"  🌐 EstateSales: {url}")
     listings = []
     try:
         resp = requests.get(url, headers=HEADERS, timeout=20)
         if resp.status_code != 200:
-            print(f"     \u26a0\ufe0f  Status {resp.status_code}")
+            print(f"     ⚠️  Status {resp.status_code}")
             return listings
         soup = BeautifulSoup(resp.text, "html.parser")
         sale_links = []
@@ -358,26 +417,33 @@ def scrape_estatesales(state, city, zip_code):
             parsed = parse_container(container_text)
             listing.update(parsed)
 
-            # If no street address found in grid, fetch the detail page
-            if not listing.get("address") or not re.match(r'^\d+\s+', listing.get("address", "")):
-                print(f"     \U0001f50d Fetching detail for: {name[:45]}")
-                street = scrape_estatesales_detail(detail_url)
+            # Fetch detail page if address OR dates are missing
+            # Both are extracted in one request — no extra cost
+            needs_address = not listing.get("address") or not re.match(r'^\d+\s+', listing.get("address", ""))
+            needs_dates   = not listing.get("dates")
+            if needs_address or needs_dates:
+                print(f"     🔍 Fetching detail for: {name[:45]}")
+                street, dates = scrape_estatesales_detail(detail_url)
                 if street:
                     listing["address"] = street
-                    print(f"         \u2713 Got address: {street}")
-                time.sleep(1.5)
+                    print(f"         ✓ Address: {street}")
+                if dates:
+                    listing["dates"] = dates
+                    print(f"         ✓ Dates:   {dates}")
+                time.sleep(1.5)  # be polite to estatesales.net
 
             if "auction" in container_text.lower() or "auction" in name.lower():
                 listing["category"] = "auction"
             listings.append(listing)
     except Exception as e:
-        print(f"     \u274c Error: {e}")
+        print(f"     ❌ Error: {e}")
     return listings
 
+
+# ══════════════════════════════════════════════════════════
 # AUCTIONZIP SCRAPER
 # ══════════════════════════════════════════════════════════
 
-# Map states to AuctionZip state codes
 AUCTIONZIP_STATES = [
     "al","ak","az","ar","ca","co","ct","de","fl","ga",
     "hi","id","il","in","ia","ks","ky","la","me","md",
@@ -565,7 +631,7 @@ def scrape_google_places(origin_lat, origin_lng, radius_miles):
                     "rating":      place.get("rating"),
                     "tags":        [],
                     "description": "Listed by Google Places",
-                    "status":      "",  # intentionally blank — no stale open/closed
+                    "status":      "",
                     "url":         f"https://www.google.com/maps/place/?q=place_id:{place_id}",
                     "company":     "",
                     "source":      "google_places",
@@ -631,7 +697,7 @@ def push_to_supabase(listings):
         "Authorization": f"Bearer {SUPABASE_KEY}",
         "Content-Type": "application/json",
         "Prefer": "resolution=merge-duplicates,return=minimal",
-	"X-Upsert": "true",
+        "X-Upsert": "true",
     }
 
     rows = []
@@ -682,6 +748,7 @@ def push_to_supabase(listings):
 
 # ══════════════════════════════════════════════════════════
 # CLEANUP — remove expired estate sale / auction listings
+# NOTE: Runs AFTER push so fresh dates are in DB before expiry check
 # ══════════════════════════════════════════════════════════
 
 MONTH_MAP = {
@@ -693,25 +760,26 @@ def parse_last_date(dates_str):
     """Extract the latest date mentioned in a dates string. Returns (month, day) or None."""
     if not dates_str:
         return None
-    # Find all month+day occurrences e.g. "Apr 12", "Apr 12, 14", "Apr 12 to Apr 14"
     matches = re.findall(
         r'(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})',
         dates_str, re.IGNORECASE
     )
     if not matches:
         return None
-    # Return the last match (end date)
     month_str, day_str = matches[-1]
     return MONTH_MAP.get(month_str.lower()[:3]), int(day_str)
 
 
 def cleanup_expired_listings():
-    """Delete estate sale and auction listings whose dates have passed."""
+    """
+    Delete estate sale and auction listings whose dates have passed.
+    Called AFTER push_to_supabase so newly scraped dates are available.
+    Listings with no dates are expired by scraped_at age (>7 days) as fallback.
+    """
     print("\n🧹 Cleaning up expired listings...")
     today = datetime.now(timezone.utc)
     current_month = today.month
     current_day   = today.day
-    current_year  = today.year
 
     endpoint = f"{SUPABASE_URL}/rest/v1/listings"
     headers = {
@@ -720,14 +788,13 @@ def cleanup_expired_listings():
         "Content-Type": "application/json",
     }
 
-    # Fetch all non-Google-Places listings with dates
+    # Fetch all non-Google-Places listings (include those with empty dates for fallback)
     try:
         resp = requests.get(
             endpoint,
             params={
-                "select": "id,dates,source,category",
+                "select": "id,dates,source,category,scraped_at",
                 "source": "neq.google_places",
-                "dates": "neq.",
                 "limit": 2000,
             },
             headers=headers,
@@ -742,16 +809,35 @@ def cleanup_expired_listings():
         return
 
     expired_ids = []
+    no_date_expired = 0
+
     for l in listings:
         if l.get("source") == "google_places":
             continue
+
         parsed = parse_last_date(l.get("dates", ""))
+
         if not parsed:
+            # Fallback: no date stored — expire if scraped more than 7 days ago
+            scraped_at = l.get("scraped_at", "")
+            if scraped_at:
+                try:
+                    scraped = datetime.fromisoformat(scraped_at.replace("Z", "+00:00"))
+                    if (today - scraped).days > 7:
+                        expired_ids.append(l["id"])
+                        no_date_expired += 1
+                except Exception:
+                    pass
             continue
+
         end_month, end_day = parsed
-        # Treat as expired if end date was before today
-        # For year: if end_month > current_month it's probably from last year
-        if end_month < current_month:
+
+        # Handle year-wrap: if end month is way ahead of current, it's likely last year
+        # e.g. cleanup runs in Jan and finds a "Dec 28" listing → expired
+        if end_month > current_month + 1:
+            # Month is more than 1 ahead — treat as prior year, already expired
+            expired_ids.append(l["id"])
+        elif end_month < current_month:
             expired_ids.append(l["id"])
         elif end_month == current_month and end_day < current_day:
             expired_ids.append(l["id"])
@@ -760,9 +846,8 @@ def cleanup_expired_listings():
         print("   ✅ No expired listings found")
         return
 
-    print(f"   Found {len(expired_ids)} expired listings — deleting...")
+    print(f"   Found {len(expired_ids)} expired listings ({no_date_expired} by age fallback) — deleting...")
 
-    # Delete in batches
     deleted = 0
     batch_size = 50
     for i in range(0, len(expired_ids), batch_size):
@@ -798,9 +883,6 @@ def main():
         print("❌ SUPABASE_SERVICE_KEY not set")
         sys.exit(1)
 
-    # Clean up expired listings first
-    cleanup_expired_listings()
-
     metros = DAILY_METROS if MODE == "daily" else US_METROS
     all_listings = []
     seen_ids = set()
@@ -808,7 +890,6 @@ def main():
     for state, city, zip_code, radius in metros:
         print(f"\n📍 {city}, {state} ({zip_code}) — {radius}mi")
 
-        # Geocode origin
         origin_lat, origin_lng = geocode(f"{city.replace('-',' ')}, {state} {zip_code}")
         if not origin_lat:
             print(f"   ⚠️  Couldn't geocode {city}, {state} — skipping")
@@ -825,7 +906,7 @@ def main():
                 seen_ids.add(l["id"])
                 all_listings.append(l)
 
-        # AuctionZip — scrape matching state
+        # AuctionZip
         az = scrape_auctionzip([state.lower()], origin_lat, origin_lng, radius)
         az = geocode_listings(az, origin_lat, origin_lng, radius)
         for l in az:
@@ -833,7 +914,7 @@ def main():
                 seen_ids.add(l["id"])
                 all_listings.append(l)
 
-        # Google Places — only on weekly/full mode
+        # Google Places — weekly/full only
         if MODE in ("weekly", "full") and GOOGLE_API_KEY:
             gp = scrape_google_places(origin_lat, origin_lng, radius)
             for l in gp:
@@ -844,10 +925,13 @@ def main():
         print(f"   Running total: {len(all_listings)} listings")
         time.sleep(2)
 
+    # Push first, then clean — cleanup uses freshly upserted dates
     if all_listings:
         push_to_supabase(all_listings)
     else:
         print("\n⚠️  No listings to push.")
+
+    cleanup_expired_listings()
 
     print(f"\n{'='*55}")
     print(f"   ✅ Done. Total pushed: {len(all_listings)}")
