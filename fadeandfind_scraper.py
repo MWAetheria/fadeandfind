@@ -772,10 +772,12 @@ def parse_last_date(dates_str):
 
 def cleanup_expired_listings():
     """
-    Delete expired listings:
-    1. estatesales.net listings not re-scraped in 8+ days (site stops showing ended sales)
-    2. Any listing whose dates have passed
-    3. Listings with no dates scraped 7+ days ago
+    Delete expired listings via three rules:
+    1. estatesales.net listings not re-scraped in 8+ days
+       (EstateSales.NET stops listing ended sales, so anything older wasn't seen = over)
+    2. Any listing whose dates field shows an end date in the past
+    3. Non-ES listings with no dates, scraped 7+ days ago
+    Called AFTER push_to_supabase so freshly upserted dates are available.
     """
     print("\n🧹 Cleaning up expired listings...")
     today = datetime.now(timezone.utc)
@@ -819,10 +821,9 @@ def cleanup_expired_listings():
 
         scraped_at = l.get("scraped_at", "")
 
-        # Rule 1: estatesales.net listings not seen in 8+ days
-        # If EstateSales.NET still had this sale active, it would have been
-        # re-scraped and upserted today, resetting scraped_at.
-        # Anything older than 8 days was not on their site — sale is over.
+        # Rule 1: estatesales.net listings not re-scraped in 8+ days
+        # If the sale was still active it would have been upserted today,
+        # resetting scraped_at. Old scraped_at = sale ended and fell off site.
         if l.get("source") == "estatesales.net" and scraped_at:
             try:
                 scraped = datetime.fromisoformat(scraped_at.replace("Z", "+00:00"))
@@ -837,6 +838,7 @@ def cleanup_expired_listings():
         parsed = parse_last_date(l.get("dates", ""))
         if parsed:
             end_month, end_day = parsed
+            # Year-wrap: month far ahead of current = prior year, already expired
             if end_month > current_month + 1:
                 expired_ids.append(l["id"])
                 date_expired += 1
@@ -863,78 +865,6 @@ def cleanup_expired_listings():
         return
 
     print(f"   Found {len(expired_ids)} expired: {stale_es} stale ES, {date_expired} date-expired, {age_expired} age-expired — deleting...")
-
-    deleted = 0
-    batch_size = 50
-    for i in range(0, len(expired_ids), batch_size):
-        batch = expired_ids[i:i+batch_size]
-        id_filter = "(" + ",".join(f'"{id}"' for id in batch) + ")"
-        try:
-            del_resp = requests.delete(
-                endpoint,
-                params={"id": f"in.{id_filter}"},
-                headers=headers,
-                timeout=30,
-            )
-            if del_resp.status_code in (200, 204):
-                deleted += len(batch)
-            else:
-                print(f"   ❌ Delete batch failed: {del_resp.status_code}")
-        except Exception as e:
-            print(f"   ❌ Delete error: {e}")
-
-    print(f"   ✅ Deleted {deleted} expired listings")
-    
-            headers=headers,
-            timeout=30,
-        )
-        if resp.status_code != 200:
-            print(f"   ⚠️  Couldn't fetch listings: {resp.status_code}")
-            return
-        listings = resp.json()
-    except Exception as e:
-        print(f"   ❌ Fetch error: {e}")
-        return
-
-    expired_ids = []
-    no_date_expired = 0
-
-    for l in listings:
-        if l.get("source") == "google_places":
-            continue
-
-        parsed = parse_last_date(l.get("dates", ""))
-
-        if not parsed:
-            # Fallback: no date stored — expire if scraped more than 7 days ago
-            scraped_at = l.get("scraped_at", "")
-            if scraped_at:
-                try:
-                    scraped = datetime.fromisoformat(scraped_at.replace("Z", "+00:00"))
-                    if (today - scraped).days > 7:
-                        expired_ids.append(l["id"])
-                        no_date_expired += 1
-                except Exception:
-                    pass
-            continue
-
-        end_month, end_day = parsed
-
-        # Handle year-wrap: if end month is way ahead of current, it's likely last year
-        # e.g. cleanup runs in Jan and finds a "Dec 28" listing → expired
-        if end_month > current_month + 1:
-            # Month is more than 1 ahead — treat as prior year, already expired
-            expired_ids.append(l["id"])
-        elif end_month < current_month:
-            expired_ids.append(l["id"])
-        elif end_month == current_month and end_day < current_day:
-            expired_ids.append(l["id"])
-
-    if not expired_ids:
-        print("   ✅ No expired listings found")
-        return
-
-    print(f"   Found {len(expired_ids)} expired listings ({no_date_expired} by age fallback) — deleting...")
 
     deleted = 0
     batch_size = 50
