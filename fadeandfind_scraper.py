@@ -788,7 +788,25 @@ def cleanup_expired_listings():
         "Content-Type": "application/json",
     }
 
-    # Fetch all non-Google-Places listings (include those with empty dates for fallback)
+    def cleanup_expired_listings():
+    """
+    Delete expired listings:
+    1. estatesales.net listings not re-scraped in 8+ days (site stops showing ended sales)
+    2. Any listing whose dates have passed
+    3. Listings with no dates scraped 7+ days ago
+    """
+    print("\n🧹 Cleaning up expired listings...")
+    today = datetime.now(timezone.utc)
+    current_month = today.month
+    current_day   = today.day
+
+    endpoint = f"{SUPABASE_URL}/rest/v1/listings"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+    }
+
     try:
         resp = requests.get(
             endpoint,
@@ -797,6 +815,94 @@ def cleanup_expired_listings():
                 "source": "neq.google_places",
                 "limit": 2000,
             },
+            headers=headers,
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            print(f"   ⚠️  Couldn't fetch listings: {resp.status_code}")
+            return
+        listings = resp.json()
+    except Exception as e:
+        print(f"   ❌ Fetch error: {e}")
+        return
+
+    expired_ids = []
+    stale_es = 0
+    date_expired = 0
+    age_expired = 0
+
+    for l in listings:
+        if l.get("source") == "google_places":
+            continue
+
+        scraped_at = l.get("scraped_at", "")
+
+        # Rule 1: estatesales.net listings not seen in 8+ days
+        # If EstateSales.NET still had this sale active, it would have been
+        # re-scraped and upserted today, resetting scraped_at.
+        # Anything older than 8 days was not on their site — sale is over.
+        if l.get("source") == "estatesales.net" and scraped_at:
+            try:
+                scraped = datetime.fromisoformat(scraped_at.replace("Z", "+00:00"))
+                if (today - scraped).days >= 8:
+                    expired_ids.append(l["id"])
+                    stale_es += 1
+                    continue
+            except Exception:
+                pass
+
+        # Rule 2: dates field populated — check if end date has passed
+        parsed = parse_last_date(l.get("dates", ""))
+        if parsed:
+            end_month, end_day = parsed
+            if end_month > current_month + 1:
+                expired_ids.append(l["id"])
+                date_expired += 1
+            elif end_month < current_month:
+                expired_ids.append(l["id"])
+                date_expired += 1
+            elif end_month == current_month and end_day < current_day:
+                expired_ids.append(l["id"])
+                date_expired += 1
+            continue
+
+        # Rule 3: no dates, not estatesales.net — expire after 7 days
+        if scraped_at:
+            try:
+                scraped = datetime.fromisoformat(scraped_at.replace("Z", "+00:00"))
+                if (today - scraped).days > 7:
+                    expired_ids.append(l["id"])
+                    age_expired += 1
+            except Exception:
+                pass
+
+    if not expired_ids:
+        print("   ✅ No expired listings found")
+        return
+
+    print(f"   Found {len(expired_ids)} expired: {stale_es} stale ES, {date_expired} date-expired, {age_expired} age-expired — deleting...")
+
+    deleted = 0
+    batch_size = 50
+    for i in range(0, len(expired_ids), batch_size):
+        batch = expired_ids[i:i+batch_size]
+        id_filter = "(" + ",".join(f'"{id}"' for id in batch) + ")"
+        try:
+            del_resp = requests.delete(
+                endpoint,
+                params={"id": f"in.{id_filter}"},
+                headers=headers,
+                timeout=30,
+            )
+            if del_resp.status_code in (200, 204):
+                deleted += len(batch)
+            else:
+                print(f"   ❌ Delete batch failed: {del_resp.status_code}")
+        except Exception as e:
+            print(f"   ❌ Delete error: {e}")
+
+    print(f"   ✅ Deleted {deleted} expired listings")
+    
             headers=headers,
             timeout=30,
         )
