@@ -772,24 +772,6 @@ def parse_last_date(dates_str):
 
 def cleanup_expired_listings():
     """
-    Delete estate sale and auction listings whose dates have passed.
-    Called AFTER push_to_supabase so newly scraped dates are available.
-    Listings with no dates are expired by scraped_at age (>7 days) as fallback.
-    """
-    print("\n🧹 Cleaning up expired listings...")
-    today = datetime.now(timezone.utc)
-    current_month = today.month
-    current_day   = today.day
-
-    endpoint = f"{SUPABASE_URL}/rest/v1/listings"
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-    }
-
-    def cleanup_expired_listings():
-    """
     Delete expired listings:
     1. estatesales.net listings not re-scraped in 8+ days (site stops showing ended sales)
     2. Any listing whose dates have passed
