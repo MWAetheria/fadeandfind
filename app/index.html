@@ -682,7 +682,7 @@ function buildGoogleMapsUrl(listings) {
   if (!valid.length) return null;
 
   const toParam = (l) => {
-    const addr = l.address && l.address.trim() && !l.address.match(/^,?\s*$/) && !l.address.match(/^[^,]+,\s*[A-Z]{2}$/);
+    const addr = l.address && l.address.trim() && !l.address.match(/^,?\s*$/);
     return addr ? l.address : `${l.lat},${l.lng}`;
   };
 
