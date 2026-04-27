@@ -245,14 +245,20 @@ def parse_container(container_text):
 def scrape_estatesales_detail(url, session=None):
     """
     Fetch individual estate sale listing page.
-    Returns (street_address, dates_string) — both may be empty strings on failure.
-    Extracts dates from the detail page since the grid page rarely exposes them.
+    Returns (street_address, dates_string, is_over).
+    is_over=True means the sale has already ended — caller should skip this listing.
     """
     try:
         requester = session or requests
         resp = requester.get(url, headers=HEADERS, timeout=20)
         if resp.status_code != 200:
-            return "", ""
+            return "", "", False
+
+        # Detect ended sales before parsing anything else
+        page_lower = resp.text.lower()
+        if "sale has already occurred" in page_lower or "sale is over" in page_lower:
+            return "", "", True
+
         soup = BeautifulSoup(resp.text, "html.parser")
         street = ""
         dates  = ""
@@ -357,7 +363,7 @@ def scrape_estatesales_detail(url, session=None):
     except Exception:
         pass
 
-    return street, dates
+    return street, dates, False
 
 
 def scrape_estatesales(state, city, zip_code):
@@ -423,7 +429,11 @@ def scrape_estatesales(state, city, zip_code):
             needs_dates   = not listing.get("dates")
             if needs_address or needs_dates:
                 print(f"     🔍 Fetching detail for: {name[:45]}")
-                street, dates = scrape_estatesales_detail(detail_url)
+                street, dates, is_over = scrape_estatesales_detail(detail_url)
+                if is_over:
+                    print(f"         ⏭️  Sale already over — skipping")
+                    time.sleep(1.5)
+                    continue
                 if street:
                     listing["address"] = street
                     print(f"         ✓ Address: {street}")
